@@ -52,6 +52,7 @@ const SCRIPT_PROVIDERS = [
 
 const DESIGN_PROVIDERS = [
   { value: 'anthropic', label: 'Claude Sonnet 4', desc: 'Best JSON compliance' },
+  { value: 'anthropic-haiku', label: 'Claude Haiku 4', desc: 'Fast & cheap (~3x less)' },
   { value: 'openai', label: 'GPT-4o', desc: 'Fast alternative' },
 ] as const;
 
@@ -479,11 +480,11 @@ export default function CreatePage() {
                       <label className="label flex items-center gap-1.5">
                         <Palette className="w-3.5 h-3.5" /> Design Compiler
                       </label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         {DESIGN_PROVIDERS.map((p) => (
                           <button
                             key={p.value}
-                            onClick={() => store.setConfig({ designProvider: p.value as 'anthropic' | 'openai' })}
+                            onClick={() => store.setConfig({ designProvider: p.value as 'anthropic' | 'anthropic-haiku' | 'openai' })}
                             disabled={isGenerating}
                             className={`p-3 rounded-xl text-left transition-all border ${
                               config.designProvider === p.value
@@ -491,7 +492,7 @@ export default function CreatePage() {
                                 : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04]'
                             }`}
                           >
-                            <p className={`text-xs font-medium ${config.designProvider === p.value ? 'text-violet-300' : 'text-slate-300'}`}>
+                            <p className={`text-[11px] font-medium ${config.designProvider === p.value ? 'text-violet-300' : 'text-slate-300'}`}>
                               {p.label}
                             </p>
                             <p className="text-[11px] text-slate-500 mt-0.5">{p.desc}</p>

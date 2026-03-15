@@ -15,9 +15,10 @@ export const maxDuration = 180;
 
 /* ─── Cost per 1M tokens (USD) ─── */
 const PRICING: Record<string, { input: number; output: number }> = {
-  gemini: { input: 1.25, output: 10.0 },       // Gemini 2.5 Pro
-  anthropic: { input: 3.0, output: 15.0 },      // Claude Sonnet 4
-  openai: { input: 2.5, output: 10.0 },         // GPT-4o
+  gemini: { input: 1.25, output: 10.0 },              // Gemini 3.1 Pro
+  anthropic: { input: 3.0, output: 15.0 },             // Claude Sonnet 4
+  'anthropic-haiku': { input: 0.80, output: 4.0 },     // Claude Haiku 4
+  openai: { input: 2.5, output: 10.0 },                // GPT-4o
 };
 
 function calcCost(provider: string, inputTokens: number, outputTokens: number) {
@@ -33,6 +34,7 @@ function resolveKey(provider: string, clientKey?: string): string | undefined {
     case 'gemini':
       return process.env.GOOGLE_API_KEY;
     case 'anthropic':
+    case 'anthropic-haiku':
       return process.env.ANTHROPIC_API_KEY;
     case 'openai':
       return process.env.OPENAI_API_KEY;
@@ -46,6 +48,8 @@ function createModel(provider: string, apiKey: string): any {
       return createGoogleGenerativeAI({ apiKey })('gemini-3.1-pro-preview');
     case 'anthropic':
       return createAnthropic({ apiKey })('claude-sonnet-4-20250514');
+    case 'anthropic-haiku':
+      return createAnthropic({ apiKey })('claude-haiku-4-20250414');
     case 'openai':
       return createOpenAI({ apiKey })('gpt-4o');
     default:

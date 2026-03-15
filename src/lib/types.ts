@@ -350,7 +350,7 @@ export interface OutroContent {
 /* ─── App Config ─── */
 
 export type ScriptProvider = 'gemini' | 'anthropic' | 'openai';
-export type DesignProvider = 'anthropic' | 'openai';
+export type DesignProvider = 'anthropic' | 'anthropic-haiku' | 'openai';
 export type TTSProvider = 'openai' | 'elevenlabs' | 'browser';
 
 export interface GenerationConfig {
