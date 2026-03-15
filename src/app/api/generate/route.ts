@@ -43,7 +43,7 @@ function resolveKey(provider: string, clientKey?: string): string | undefined {
 function createModel(provider: string, apiKey: string): any {
   switch (provider) {
     case 'gemini':
-      return createGoogleGenerativeAI({ apiKey })('gemini-2.5-pro-preview-06-05');
+      return createGoogleGenerativeAI({ apiKey })('gemini-3.1-pro');
     case 'anthropic':
       return createAnthropic({ apiKey })('claude-sonnet-4-20250514');
     case 'openai':
