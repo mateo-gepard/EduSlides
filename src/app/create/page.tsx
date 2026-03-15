@@ -268,6 +268,12 @@ export default function CreatePage() {
           <ArrowLeft className="w-4 h-4" />
           Back
         </button>
+        <button
+          onClick={() => router.push('/library')}
+          className="text-sm text-slate-400 hover:text-white transition-colors"
+        >
+          Library
+        </button>
       </nav>
 
       {/* ─── Main ─── */}
