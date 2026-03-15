@@ -1,0 +1,297 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design Tokens ─── */
+:root {
+  --color-bg-deep: #020617;
+  --color-bg-primary: #030712;
+  --color-bg-secondary: #0f172a;
+  --color-bg-tertiary: #1e293b;
+  --color-accent: #818cf8;
+  --color-accent-bright: #a5b4fc;
+  --color-accent-dim: #6366f1;
+  --color-accent-glow: rgba(129, 140, 248, 0.12);
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+  --color-info: #60a5fa;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+/* ─── Base ─── */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--color-bg-primary);
+    color: #f1f5f9;
+    overflow-x: hidden;
+  }
+  ::selection {
+    background: rgba(129, 140, 248, 0.3);
+    color: #fff;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+}
+
+/* ─── Component Classes ─── */
+@layer components {
+  /* Glass panel */
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-lg);
+  }
+  .glass-hover {
+    transition: all 0.25s ease;
+  }
+  .glass-hover:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Accent glow */
+  .accent-glow {
+    box-shadow: 0 0 0 1px var(--color-accent-dim),
+      0 0 20px -4px var(--color-accent-glow),
+      0 0 40px -8px var(--color-accent-glow);
+  }
+
+  /* Mesh gradient background */
+  .mesh-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .mesh-bg::before,
+  .mesh-bg::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.5;
+  }
+  .mesh-bg::before {
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+    top: -10%;
+    left: -5%;
+    animation: meshMove 20s ease-in-out infinite;
+  }
+  .mesh-bg::after {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+    bottom: -10%;
+    right: -5%;
+    animation: meshMove 25s ease-in-out infinite reverse;
+  }
+
+  /* Slide container */
+  .slide-frame {
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    max-width: 1200px;
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(145deg, #080d1c 0%, #0a0f1a 50%, #070b17 100%);
+  }
+
+  /* Slide inner padding */
+  .slide-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 6% 8%;
+  }
+
+  /* Progress bar */
+  .progress-track {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: height 0.15s ease;
+  }
+  .progress-track:hover {
+    height: 5px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--color-accent);
+    border-radius: 2px;
+    transition: width 0.3s linear;
+  }
+
+  /* Button base */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--color-accent-dim);
+    color: #fff;
+    padding: 10px 24px;
+    font-size: 15px;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-accent);
+    box-shadow: 0 0 24px -4px var(--color-accent-glow);
+  }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: #cbd5e1;
+    padding: 10px 24px;
+    font-size: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f1f5f9;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: #94a3b8;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+  }
+
+  /* Input / Select base */
+  .input-base {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    color: #f1f5f9;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .input-base::placeholder {
+    color: #475569;
+  }
+  .input-base:focus {
+    border-color: var(--color-accent-dim);
+    box-shadow: 0 0 0 3px var(--color-accent-glow);
+  }
+
+  /* Label */
+  .label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #94a3b8;
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  /* Card */
+  .card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    transition: all 0.25s ease;
+  }
+  .card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  /* Quiz option */
+  .quiz-option {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 17px;
+  }
+  .quiz-option:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+  .quiz-option.correct {
+    background: rgba(52, 211, 153, 0.1);
+    border-color: rgba(52, 211, 153, 0.4);
+    color: #6ee7b7;
+  }
+  .quiz-option.incorrect {
+    background: rgba(248, 113, 113, 0.08);
+    border-color: rgba(248, 113, 113, 0.3);
+    color: #fca5a5;
+  }
+  .quiz-option.disabled {
+    pointer-events: none;
+    opacity: 0.6;
+  }
+}
+
+/* ─── Utilities ─── */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+  .delay-600 { animation-delay: 600ms; }
+  .delay-700 { animation-delay: 700ms; }
+  .delay-800 { animation-delay: 800ms; }
+}
