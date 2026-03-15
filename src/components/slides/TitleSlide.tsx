@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import SlideIcon from '../SlideIcon';
 import type { TitleContent } from '@/lib/types';
 
 export default function TitleSlide({ content }: { content: TitleContent }) {
@@ -8,9 +9,9 @@ export default function TitleSlide({ content }: { content: TitleContent }) {
     <div className="flex flex-col items-center justify-center h-full text-center px-12 relative overflow-hidden">
       {/* Decorative rings */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-[600px] h-[600px] rounded-full border border-white/[0.03] absolute" />
-        <div className="w-[400px] h-[400px] rounded-full border border-white/[0.05] absolute" />
-        <div className="w-[200px] h-[200px] rounded-full border border-white/[0.04] absolute" />
+        <div className="w-[600px] h-[600px] rounded-full border border-slate-200/50 absolute" />
+        <div className="w-[400px] h-[400px] rounded-full border border-slate-200/70 absolute" />
+        <div className="w-[200px] h-[200px] rounded-full border border-slate-200/50 absolute" />
       </div>
 
       {/* Badge */}
@@ -18,7 +19,7 @@ export default function TitleSlide({ content }: { content: TitleContent }) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.6 }}
-        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs font-medium tracking-widest uppercase text-indigo-300 mb-8"
+        className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-indigo-50 border border-indigo-200/80 text-xs font-semibold tracking-widest uppercase text-indigo-600 mb-8 shadow-sm"
       >
         {content.badge}
       </motion.div>
@@ -28,7 +29,7 @@ export default function TitleSlide({ content }: { content: TitleContent }) {
         initial={{ opacity: 0, y: 30, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ delay: 0.4, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white leading-[1.05] max-w-4xl"
+        className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight text-slate-800 leading-[1.08] max-w-4xl"
       >
         {content.title}
       </motion.h1>
@@ -38,7 +39,7 @@ export default function TitleSlide({ content }: { content: TitleContent }) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.7, duration: 0.6 }}
-        className="text-lg sm:text-xl text-slate-400 mt-5 max-w-2xl leading-relaxed"
+        className="text-lg sm:text-xl text-slate-500 mt-5 max-w-2xl leading-relaxed"
       >
         {content.subtitle}
       </motion.p>
@@ -54,9 +55,9 @@ export default function TitleSlide({ content }: { content: TitleContent }) {
           {content.meta.map((m, i) => (
             <span
               key={i}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-slate-300"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/70 border border-slate-200 text-sm text-slate-600 shadow-sm backdrop-blur-sm"
             >
-              <span className="text-base">{m.icon}</span>
+              <SlideIcon name={m.icon} size={16} className="text-slate-400" />
               {m.text}
             </span>
           ))}

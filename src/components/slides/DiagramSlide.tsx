@@ -8,11 +8,9 @@ import type { DiagramContent } from '@/lib/types';
 function BodyLayout({ content }: { content: DiagramContent }) {
   return (
     <svg viewBox="0 0 200 400" className="w-full h-full max-h-[90%]">
-      {/* Silhouette */}
-      <ellipse cx="100" cy="40" rx="22" ry="28" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+      <ellipse cx="100" cy="40" rx="22" ry="28" fill="rgba(0,0,0,0.03)" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
       <path d="M100 68 L100 220 M100 110 L55 180 M100 110 L145 180 M100 220 L65 350 M100 220 L135 350"
-        stroke="rgba(255,255,255,0.12)" strokeWidth="2" strokeLinecap="round" fill="none" />
-      {/* Nodes as markers on body */}
+        stroke="rgba(0,0,0,0.1)" strokeWidth="2" strokeLinecap="round" fill="none" />
       {content.nodes.map((node, i) => {
         const cx = (node.x / 100) * 200;
         const cy = (node.y / 100) * 400;
@@ -22,7 +20,7 @@ function BodyLayout({ content }: { content: DiagramContent }) {
             <motion.circle
               cx={cx} cy={cy} r={r}
               fill={node.color}
-              fillOpacity={0.3}
+              fillOpacity={0.2}
               stroke={node.color}
               strokeWidth={1.5}
               initial={{ scale: 0, opacity: 0 }}
@@ -31,7 +29,7 @@ function BodyLayout({ content }: { content: DiagramContent }) {
             />
             <motion.text
               x={cx + r + 6} y={cy + 4}
-              fill="#e2e8f0"
+              fill="#334155"
               fontSize="10"
               fontWeight="600"
               initial={{ opacity: 0 }}
@@ -52,16 +50,13 @@ function RadialLayout({ content }: { content: DiagramContent }) {
   const cx = 200, cy = 200, radius = 140;
   return (
     <svg viewBox="0 0 400 400" className="w-full h-full max-h-[90%]">
-      {/* Center */}
       {content.centerLabel && (
         <g>
-          <circle cx={cx} cy={cy} r="40" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-          <text x={cx} y={cy + 4} textAnchor="middle" fill="#e2e8f0" fontSize="11" fontWeight="700">{content.centerLabel}</text>
+          <circle cx={cx} cy={cy} r="40" fill="rgba(0,0,0,0.03)" stroke="rgba(0,0,0,0.08)" strokeWidth="1" />
+          <text x={cx} y={cy + 4} textAnchor="middle" fill="#334155" fontSize="11" fontWeight="700">{content.centerLabel}</text>
         </g>
       )}
-      {/* Orbit ring */}
-      <circle cx={cx} cy={cy} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="4 4" />
-      {/* Nodes */}
+      <circle cx={cx} cy={cy} r={radius} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="1" strokeDasharray="4 4" />
       {nodes.map((node, i) => {
         const angle = (i / nodes.length) * Math.PI * 2 - Math.PI / 2;
         const nx = cx + Math.cos(angle) * radius;
@@ -69,11 +64,10 @@ function RadialLayout({ content }: { content: DiagramContent }) {
         const r = node.size === 'lg' ? 28 : node.size === 'sm' ? 16 : 22;
         return (
           <g key={node.id}>
-            {/* Connection line to center */}
-            <line x1={cx} y1={cy} x2={nx} y2={ny} stroke={`${node.color}40`} strokeWidth="1" strokeDasharray="3 3" />
+            <line x1={cx} y1={cy} x2={nx} y2={ny} stroke={`${node.color}30`} strokeWidth="1" strokeDasharray="3 3" />
             <motion.circle
               cx={nx} cy={ny} r={r}
-              fill={`${node.color}18`}
+              fill={`${node.color}15`}
               stroke={node.color}
               strokeWidth={1.5}
               initial={{ scale: 0, opacity: 0 }}
@@ -83,7 +77,7 @@ function RadialLayout({ content }: { content: DiagramContent }) {
             <motion.text
               x={nx} y={ny + 4}
               textAnchor="middle"
-              fill="#e2e8f0"
+              fill="#334155"
               fontSize="9"
               fontWeight="600"
               initial={{ opacity: 0 }}
@@ -102,7 +96,6 @@ function RadialLayout({ content }: { content: DiagramContent }) {
 function ScatterLayout({ content }: { content: DiagramContent }) {
   return (
     <svg viewBox="0 0 400 400" className="w-full h-full max-h-[90%]">
-      {/* Connections */}
       {content.connections?.map((conn, i) => {
         const from = content.nodes.find((n) => n.id === conn.from);
         const to = content.nodes.find((n) => n.id === conn.to);
@@ -113,7 +106,7 @@ function ScatterLayout({ content }: { content: DiagramContent }) {
           <motion.line
             key={i}
             x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke="rgba(255,255,255,0.1)"
+            stroke="rgba(0,0,0,0.08)"
             strokeWidth="1"
             strokeDasharray={conn.style === 'dashed' ? '5 5' : undefined}
             initial={{ pathLength: 0 }}
@@ -122,7 +115,6 @@ function ScatterLayout({ content }: { content: DiagramContent }) {
           />
         );
       })}
-      {/* Nodes */}
       {content.nodes.map((node, i) => {
         const nx = (node.x / 100) * 400;
         const ny = (node.y / 100) * 400;
@@ -131,7 +123,7 @@ function ScatterLayout({ content }: { content: DiagramContent }) {
           <g key={node.id}>
             <motion.circle
               cx={nx} cy={ny} r={r}
-              fill={`${node.color}20`}
+              fill={`${node.color}15`}
               stroke={node.color}
               strokeWidth={1.5}
               initial={{ scale: 0, opacity: 0 }}
@@ -141,7 +133,7 @@ function ScatterLayout({ content }: { content: DiagramContent }) {
             <motion.text
               x={nx} y={ny - r - 6}
               textAnchor="middle"
-              fill="#e2e8f0"
+              fill="#334155"
               fontSize="10"
               fontWeight="600"
               initial={{ opacity: 0 }}
@@ -167,11 +159,10 @@ function FlowLayout({ content }: { content: DiagramContent }) {
         const ny = 100;
         return (
           <g key={node.id}>
-            {/* Arrow to next */}
             {i < nodes.length - 1 && (
               <motion.line
                 x1={nx + 30} y1={ny} x2={gap * (i + 2) - 30} y2={ny}
-                stroke="rgba(255,255,255,0.15)"
+                stroke="rgba(0,0,0,0.12)"
                 strokeWidth="1.5"
                 markerEnd="url(#arrowhead)"
                 initial={{ opacity: 0 }}
@@ -181,14 +172,14 @@ function FlowLayout({ content }: { content: DiagramContent }) {
             )}
             <motion.rect
               x={nx - 28} y={ny - 28} width="56" height="56" rx="14"
-              fill={`${node.color}15`}
+              fill={`${node.color}12`}
               stroke={node.color}
               strokeWidth={1.5}
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.3 + i * 0.15, duration: 0.5 }}
             />
-            <text x={nx} y={ny + 4} textAnchor="middle" fill="#e2e8f0" fontSize="9" fontWeight="600">
+            <text x={nx} y={ny + 4} textAnchor="middle" fill="#334155" fontSize="9" fontWeight="600">
               {node.label}
             </text>
           </g>
@@ -196,7 +187,7 @@ function FlowLayout({ content }: { content: DiagramContent }) {
       })}
       <defs>
         <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-          <path d="M0,0 L6,3 L0,6 Z" fill="rgba(255,255,255,0.3)" />
+          <path d="M0,0 L6,3 L0,6 Z" fill="rgba(0,0,0,0.25)" />
         </marker>
       </defs>
     </svg>
@@ -222,7 +213,7 @@ function LayersLayout({ content }: { content: DiagramContent }) {
           />
           <motion.text
             x="200" y={20 + i * bandH + bandH / 2 + 4}
-            textAnchor="middle" fill="#e2e8f0" fontSize="11" fontWeight="600"
+            textAnchor="middle" fill="#334155" fontSize="11" fontWeight="600"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 + i * 0.12 }}
@@ -247,25 +238,23 @@ export default function DiagramSlide({ content }: { content: DiagramContent }) {
   const Layout = layoutMap[content.layout] || ScatterLayout;
 
   return (
-    <div className="flex h-full px-8 py-8 gap-6">
+    <div className="flex h-full px-8 py-8 gap-6 overflow-hidden">
       {/* Diagram area */}
-      <div className="flex-1 flex items-center justify-center min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="w-full h-full flex flex-col"
+          className="mb-3 shrink-0"
         >
-          <div className="mb-3">
-            <span className="text-xs font-medium tracking-widest uppercase text-slate-500">
-              {content.chapter}
-            </span>
-            <h2 className="text-2xl font-bold text-white">{content.heading}</h2>
-          </div>
-          <div className="flex-1 flex items-center justify-center">
-            <Layout content={content} />
-          </div>
+          <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">
+            {content.chapter}
+          </span>
+          <h2 className="text-2xl font-bold text-slate-800">{content.heading}</h2>
         </motion.div>
+        <div className="flex-1 flex items-center justify-center min-h-0">
+          <Layout content={content} />
+        </div>
       </div>
 
       {/* Info list sidebar */}
@@ -282,19 +271,18 @@ export default function DiagramSlide({ content }: { content: DiagramContent }) {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 + i * 0.1 }}
-              className="rounded-xl p-3 border border-white/[0.06]"
-              style={{ background: `${item.color}08` }}
+              className="rounded-xl p-3 border border-slate-200 bg-white/60 shadow-sm"
             >
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
-                <span className="text-xs font-semibold text-white">{item.label}</span>
+                <span className="text-xs font-semibold text-slate-700">{item.label}</span>
                 {item.value && (
                   <span className="text-xs font-mono ml-auto" style={{ color: item.color }}>
                     {item.value}
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">{item.description}</p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">{item.description}</p>
             </motion.div>
           ))}
         </motion.div>

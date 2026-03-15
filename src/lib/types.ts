@@ -25,7 +25,15 @@ export type SlideType =
   | 'comparison'
   | 'quiz'
   | 'summary'
-  | 'outro';
+  | 'outro'
+  | 'formula'
+  | 'graph'
+  | 'quote'
+  | 'infographic'
+  | 'image-spotlight'
+  | 'funfact'
+  | 'definition'
+  | 'code';
 
 /* ─── Presentation ─── */
 
@@ -77,7 +85,15 @@ export type SlideContent =
   | ComparisonContent
   | QuizContent
   | SummaryContent
-  | OutroContent;
+  | OutroContent
+  | FormulaContent
+  | GraphContent
+  | QuoteContent
+  | InfographicContent
+  | ImageSpotlightContent
+  | FunFactContent
+  | DefinitionContent
+  | CodeContent;
 
 /* ═══════ Slide Content Types (all universal) ═══════ */
 
@@ -345,6 +361,118 @@ export interface OutroContent {
   title: string;
   message: string;
   sources: string[];
+}
+
+/* ═══════ New Slide Content Types ═══════ */
+
+/** LaTeX formula with optional step-by-step derivation */
+export interface FormulaContent {
+  type: 'formula';
+  chapter: string;
+  heading: string;
+  formula: string;
+  description: string;
+  steps?: { label: string; formula: string; explanation: string }[];
+  accent: string;
+}
+
+/** Animated line/scatter/area graph with labeled axes */
+export interface GraphContent {
+  type: 'graph';
+  chapter: string;
+  heading: string;
+  graphType: 'line' | 'scatter' | 'area' | 'multi-line';
+  xLabel: string;
+  yLabel: string;
+  series: {
+    label: string;
+    color: string;
+    points: { x: number; y: number }[];
+  }[];
+  annotations?: { x: number; y: number; text: string; color: string }[];
+  source?: string;
+}
+
+/** Blockquote with author attribution */
+export interface QuoteContent {
+  type: 'quote';
+  chapter: string;
+  heading: string;
+  quote: string;
+  author: string;
+  role?: string;
+  year?: string;
+  context?: string;
+  accent: string;
+}
+
+/** Visual data narrative: icons + numbers + flowing layout */
+export interface InfographicContent {
+  type: 'infographic';
+  chapter: string;
+  heading: string;
+  layout: 'vertical' | 'horizontal' | 'centered';
+  items: {
+    icon: string;
+    value: string;
+    label: string;
+    description: string;
+    color: string;
+  }[];
+  connector?: string;
+}
+
+/** Full-bleed image with Ken Burns animation + text overlay */
+export interface ImageSpotlightContent {
+  type: 'image-spotlight';
+  chapter: string;
+  heading: string;
+  imageQuery: string;
+  caption: string;
+  description: string;
+  overlayPosition: 'bottom-left' | 'bottom-right' | 'top-left' | 'center';
+  kenBurns: 'zoom-in' | 'zoom-out' | 'pan-left' | 'pan-right';
+}
+
+/** Eye-catching trivia / fun-fact card */
+export interface FunFactContent {
+  type: 'funfact';
+  chapter: string;
+  heading: string;
+  icon: string;
+  fact: string;
+  explanation: string;
+  source?: string;
+  accent: string;
+}
+
+/** Term definition card(s) with optional related terms */
+export interface DefinitionContent {
+  type: 'definition';
+  chapter: string;
+  heading: string;
+  terms: {
+    term: string;
+    pronunciation?: string;
+    partOfSpeech?: string;
+    definition: string;
+    example?: string;
+    relatedTerms?: string[];
+    color: string;
+  }[];
+}
+
+/** Syntax-highlighted code block with explanation */
+export interface CodeContent {
+  type: 'code';
+  chapter: string;
+  heading: string;
+  language: string;
+  code: string;
+  highlights?: number[];
+  explanation: string;
+  output?: string;
+  accent: string;
 }
 
 /* ─── App Config ─── */

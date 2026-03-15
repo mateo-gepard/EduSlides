@@ -189,8 +189,16 @@ export default function CreatePage() {
         }
       }
 
-      // Fetch images for slides that have imageQuery
+      // Fetch images for slides that have imageQuery (including image-spotlight content)
       if (pendingPresentation) {
+        // Also pull imageQuery from image-spotlight content into slide level
+        for (const slide of pendingPresentation.slides) {
+          if (slide.content?.type === 'image-spotlight' && !slide.imageQuery) {
+            const isc = slide.content as { imageQuery?: string };
+            if (isc.imageQuery) slide.imageQuery = isc.imageQuery;
+          }
+        }
+
         const imgSlides = pendingPresentation.slides.filter((s) => s.imageQuery);
         if (imgSlides.length > 0) {
           store.setPhase('designing', 'Loading reference images...');

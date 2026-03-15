@@ -22,6 +22,14 @@ const ComparisonSlide = dynamic(() => import('./slides/ComparisonSlide'));
 const QuizSlide = dynamic(() => import('./slides/QuizSlide'));
 const SummarySlide = dynamic(() => import('./slides/SummarySlide'));
 const OutroSlide = dynamic(() => import('./slides/OutroSlide'));
+const FormulaSlide = dynamic(() => import('./slides/FormulaSlide'));
+const GraphSlide = dynamic(() => import('./slides/GraphSlide'));
+const QuoteSlide = dynamic(() => import('./slides/QuoteSlide'));
+const InfographicSlide = dynamic(() => import('./slides/InfographicSlide'));
+const ImageSpotlightSlide = dynamic(() => import('./slides/ImageSpotlightSlide'));
+const FunFactSlide = dynamic(() => import('./slides/FunFactSlide'));
+const DefinitionSlide = dynamic(() => import('./slides/DefinitionSlide'));
+const CodeSlide = dynamic(() => import('./slides/CodeSlide'));
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const renderers: Record<string, React.ComponentType<{ content: any }>> = {
@@ -42,11 +50,27 @@ const renderers: Record<string, React.ComponentType<{ content: any }>> = {
   quiz: QuizSlide,
   summary: SummarySlide,
   outro: OutroSlide,
+  formula: FormulaSlide,
+  graph: GraphSlide,
+  quote: QuoteSlide,
+  infographic: InfographicSlide,
+  funfact: FunFactSlide,
+  definition: DefinitionSlide,
+  code: CodeSlide,
 };
+
+/* image-spotlight needs imageUrl passed directly */
+const ImageSpotlightWrapper = ImageSpotlightSlide as React.ComponentType<{ content: any; imageUrl?: string }>;
 
 export default function SlideRenderer({ slide }: { slide: Slide }) {
   const content = slide.content as SlideContent;
   const type = content?.type || slide.type;
+
+  /* image-spotlight gets special treatment — no overlay, image is the slide */
+  if (type === 'image-spotlight') {
+    return <ImageSpotlightWrapper content={content} imageUrl={slide.imageUrl} />;
+  }
+
   const Renderer = renderers[type];
 
   if (!Renderer) {
@@ -73,7 +97,7 @@ function SlideImage({ url }: { url: string }) {
 
   return (
     <div
-      className={`absolute right-[4%] bottom-[14%] w-[16%] rounded-xl overflow-hidden shadow-2xl shadow-black/60 border border-white/[0.08] z-10 transition-opacity duration-700 ${
+      className={`absolute right-[4%] bottom-[14%] w-[16%] rounded-xl overflow-hidden shadow-lg border border-slate-200 z-10 transition-opacity duration-700 ${
         loaded ? 'opacity-100' : 'opacity-0'
       }`}
     >

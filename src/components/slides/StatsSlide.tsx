@@ -2,17 +2,10 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
+import SlideIcon from '../SlideIcon';
 import type { StatsContent } from '@/lib/types';
 
-function AnimatedCounter({
-  target,
-  suffix,
-  delay,
-}: {
-  target: number;
-  suffix?: string;
-  delay: number;
-}) {
+function AnimatedCounter({ target, suffix, delay }: { target: number; suffix?: string; delay: number }) {
   const [val, setVal] = useState(0);
   const ref = useRef<number>(undefined);
 
@@ -23,7 +16,6 @@ function AnimatedCounter({
       const animate = (now: number) => {
         const elapsed = now - start;
         const progress = Math.min(elapsed / duration, 1);
-        // Ease out cubic
         const eased = 1 - Math.pow(1 - progress, 3);
         setVal(Math.round(eased * target));
         if (progress < 1) ref.current = requestAnimationFrame(animate);
@@ -49,16 +41,16 @@ export default function StatsSlide({ content }: { content: StatsContent }) {
   const cols = items.length <= 2 ? 2 : items.length <= 4 ? 2 : 3;
 
   return (
-    <div className="flex flex-col h-full px-10 py-10">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
-        <span className="text-xs font-medium tracking-widest uppercase text-slate-500">
+    <div className="flex flex-col h-full px-10 py-10 overflow-hidden">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6 shrink-0">
+        <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">
           {content.chapter}
         </span>
-        <h2 className="text-2xl font-bold text-white mt-1">{content.heading}</h2>
+        <h2 className="text-2xl font-bold text-slate-800 mt-1">{content.heading}</h2>
       </motion.div>
 
       <div
-        className="grid gap-5 flex-1 auto-rows-fr"
+        className="grid gap-5 flex-1 auto-rows-fr min-h-0"
         style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
       >
         {items.map((item, i) => (
@@ -67,19 +59,15 @@ export default function StatsSlide({ content }: { content: StatsContent }) {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ delay: 0.3 + i * 0.12, duration: 0.5 }}
-            className="rounded-2xl border border-white/[0.06] p-6 flex flex-col items-center justify-center text-center relative overflow-hidden"
-            style={{ background: `${item.color}05` }}
+            className="rounded-2xl border border-slate-200 p-6 flex flex-col items-center justify-center text-center relative overflow-hidden bg-white/60 shadow-sm"
           >
-            {/* Glow */}
-            <div
-              className="absolute inset-0 opacity-10 blur-[60px] pointer-events-none"
-              style={{ background: item.color }}
-            />
-            <div className="text-3xl mb-3">{item.icon}</div>
+            <div className="mb-3">
+              <SlideIcon name={item.icon} size={32} color={item.color} />
+            </div>
             <div className="text-4xl sm:text-5xl font-black" style={{ color: item.color }}>
               <AnimatedCounter target={item.value} suffix={item.suffix} delay={500 + i * 200} />
             </div>
-            <div className="text-sm text-slate-400 mt-2">{item.label}</div>
+            <div className="text-sm text-slate-500 mt-2">{item.label}</div>
           </motion.div>
         ))}
       </div>

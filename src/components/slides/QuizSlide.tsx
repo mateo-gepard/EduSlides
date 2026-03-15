@@ -31,10 +31,10 @@ export default function QuizSlide({ content }: { content: QuizContent }) {
   if (!q) return null;
 
   return (
-    <div className="flex flex-col h-full px-10 py-10">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4">
-        <span className="text-xs font-medium tracking-widest uppercase text-slate-500">{content.chapter}</span>
-        <h2 className="text-2xl font-bold text-white mt-1">{content.heading}</h2>
+    <div className="flex flex-col h-full px-10 py-10 overflow-hidden">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4 shrink-0">
+        <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">{content.chapter}</span>
+        <h2 className="text-2xl font-bold text-slate-800 mt-1">{content.heading}</h2>
       </motion.div>
 
       <AnimatePresence mode="wait">
@@ -44,38 +44,36 @@ export default function QuizSlide({ content }: { content: QuizContent }) {
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -30 }}
-            className="flex-1 flex flex-col"
+            className="flex-1 flex flex-col min-h-0 overflow-y-auto"
           >
             {/* Progress */}
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex-1 h-1 rounded-full bg-white/[0.06]">
+            <div className="flex items-center gap-3 mb-6 shrink-0">
+              <div className="flex-1 h-1.5 rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-indigo-500 transition-all duration-500"
                   style={{ width: `${((current + 1) / questions.length) * 100}%` }}
                 />
               </div>
-              <span className="text-xs text-slate-500 font-mono">
+              <span className="text-xs text-slate-400 font-mono">
                 {current + 1}/{questions.length}
               </span>
             </div>
 
-            {/* Question */}
-            <h3 className="text-lg font-semibold text-white mb-6">{q.question}</h3>
+            <h3 className="text-lg font-semibold text-slate-800 mb-6 shrink-0">{q.question}</h3>
 
-            {/* Options */}
             <div className="space-y-3 flex-1">
               {q.options.map((opt, i) => {
                 const isCorrect = i === q.correctIndex;
                 const isSelected = selected === i;
                 const revealed = selected !== null;
 
-                let borderColor = 'rgba(255,255,255,0.06)';
-                let bg = 'transparent';
+                let borderColor = '#e2e8f0';
+                let bg = 'white';
                 if (revealed && isCorrect) {
-                  borderColor = 'rgba(52,211,153,0.4)';
+                  borderColor = 'rgba(52,211,153,0.5)';
                   bg = 'rgba(52,211,153,0.06)';
                 } else if (revealed && isSelected && !isCorrect) {
-                  borderColor = 'rgba(248,113,113,0.4)';
+                  borderColor = 'rgba(248,113,113,0.5)';
                   bg = 'rgba(248,113,113,0.06)';
                 }
 
@@ -85,15 +83,15 @@ export default function QuizSlide({ content }: { content: QuizContent }) {
                     onClick={() => handleSelect(i)}
                     whileHover={!revealed ? { scale: 1.01 } : undefined}
                     whileTap={!revealed ? { scale: 0.99 } : undefined}
-                    className="w-full text-left px-5 py-3.5 rounded-xl border transition-all text-sm flex items-center gap-3"
+                    className="w-full text-left px-5 py-3.5 rounded-xl border transition-all text-sm flex items-center gap-3 shadow-sm"
                     style={{ borderColor, background: bg }}
                   >
-                    <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-semibold bg-white/[0.04] text-slate-400 shrink-0">
+                    <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-semibold bg-slate-100 text-slate-500 shrink-0">
                       {String.fromCharCode(65 + i)}
                     </span>
-                    <span className="text-slate-300">{opt}</span>
+                    <span className="text-slate-700">{opt}</span>
                     {revealed && isCorrect && (
-                      <svg className="w-5 h-5 text-emerald-400 ml-auto shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-5 h-5 text-emerald-500 ml-auto shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
@@ -107,20 +105,19 @@ export default function QuizSlide({ content }: { content: QuizContent }) {
               })}
             </div>
 
-            {/* Explanation */}
             <AnimatePresence>
               {selected !== null && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  className="mt-4"
+                  className="mt-4 shrink-0"
                 >
-                  <div className="rounded-xl p-4 bg-white/[0.03] border border-white/[0.06] text-sm text-slate-400">
+                  <div className="rounded-xl p-4 bg-slate-50 border border-slate-200 text-sm text-slate-600">
                     {q.explanation}
                   </div>
                   <button
                     onClick={handleNext}
-                    className="mt-3 px-5 py-2 rounded-lg bg-indigo-500/15 text-indigo-300 text-sm font-medium hover:bg-indigo-500/25 transition-colors"
+                    className="mt-3 px-5 py-2 rounded-lg bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-600 transition-colors shadow-sm"
                   >
                     {current < questions.length - 1 ? 'Next Question' : 'See Results'}
                   </button>
@@ -129,17 +126,16 @@ export default function QuizSlide({ content }: { content: QuizContent }) {
             </AnimatePresence>
           </motion.div>
         ) : (
-          /* ─── Results ─── */
           <motion.div
             key="results"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex-1 flex flex-col items-center justify-center text-center"
           >
-            <div className="text-6xl font-black text-indigo-400 mb-3">
+            <div className="text-6xl font-black text-indigo-500 mb-3">
               {score}/{questions.length}
             </div>
-            <p className="text-lg text-white font-semibold mb-2">
+            <p className="text-lg text-slate-800 font-semibold mb-2">
               {score === questions.length
                 ? 'Perfect!'
                 : score >= questions.length * 0.7
@@ -151,7 +147,7 @@ export default function QuizSlide({ content }: { content: QuizContent }) {
             </p>
             <button
               onClick={() => { setCurrent(0); setSelected(null); setScore(0); setShowResult(false); }}
-              className="mt-6 px-5 py-2 rounded-lg bg-white/[0.06] border border-white/[0.06] text-sm text-slate-300 hover:bg-white/[0.1] transition-colors"
+              className="mt-6 px-5 py-2 rounded-lg bg-slate-100 border border-slate-200 text-sm text-slate-600 hover:bg-slate-200 transition-colors"
             >
               Try Again
             </button>
