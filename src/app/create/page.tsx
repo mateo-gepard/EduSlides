@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { usePresentationStore } from '@/stores/presentation-store';
+import { savePresentation } from '@/lib/firestore';
 import type { Presentation, GenerationPhase } from '@/lib/types';
 
 /* ─── Constants ─── */
@@ -209,6 +210,22 @@ export default function CreatePage() {
         }
         store.setPresentation(pendingPresentation);
         store.setPhase('complete', 'Presentation ready!');
+
+        // Save to Firestore (fire-and-forget)
+        const costData = store.generationCost ?? undefined;
+        savePresentation(
+          pendingPresentation,
+          {
+            topic: config.topic,
+            subject: config.subject,
+            depth: config.depth,
+            duration: config.duration,
+            language: config.language,
+            scriptProvider: config.scriptProvider,
+            designProvider: config.designProvider,
+          },
+          costData ? { totalCost: costData.totalCost, costs: costData.costs } : undefined,
+        ).catch(() => { /* Firestore save is best-effort */ });
       }
     } catch (err) {
       if ((err as Error).name === 'AbortError') {

@@ -202,7 +202,7 @@ export default function PlayerPage() {
       onClick={showControlsTemporarily}
     >
       {/* ─── Slide frame ─── */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      <div className="absolute inset-0 flex items-center justify-center pb-16 pt-12">
         <div
           className="relative w-full h-full max-w-[177.78vh] max-h-[56.25vw] overflow-hidden"
           style={{ aspectRatio: '16/9' }}
