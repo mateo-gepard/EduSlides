@@ -45,7 +45,7 @@ const LANGUAGES = [
 ];
 
 const SCRIPT_PROVIDERS = [
-  { value: 'gemini', label: 'Gemini 2.5 Pro', desc: 'Deep research & knowledge' },
+  { value: 'gemini', label: 'Gemini 3.1 Pro', desc: 'Deep research & knowledge' },
   { value: 'anthropic', label: 'Claude Sonnet 4', desc: 'Precise & structured' },
   { value: 'openai', label: 'GPT-4o', desc: 'Fast & versatile' },
 ] as const;
@@ -250,15 +250,22 @@ export default function CreatePage() {
       <div className="mesh-bg" />
 
       {/* ─── Nav ─── */}
-      <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-7xl mx-auto">
+      <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-7xl mx-auto border-b border-white/[0.04]">
         <button
           onClick={() => router.push('/')}
-          className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
         >
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-            <Layers className="w-4 h-4 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <Layers className="w-4.5 h-4.5 text-white" />
           </div>
-          <span className="text-lg font-semibold tracking-tight text-white">EduSlides</span>
+          <span className="text-lg font-bold tracking-tight text-white">EduSlides</span>
+        </button>
+        <button
+          onClick={() => router.push('/')}
+          className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
         </button>
       </nav>
 
@@ -266,9 +273,13 @@ export default function CreatePage() {
       <main className="relative z-10 max-w-3xl mx-auto px-6 pb-24">
         <motion.div initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.08 } } }}>
           {/* Header */}
-          <motion.div variants={fadeUp} className="mb-10">
-            <h1 className="text-3xl font-bold text-white mb-2">Create Presentation</h1>
-            <p className="text-slate-400">Describe a topic or upload a PDF. AI does the rest.</p>
+          <motion.div variants={fadeUp} className="mb-10 pt-4">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/[0.07] border border-indigo-500/20 text-indigo-300 text-xs font-medium mb-5">
+              <Sparkles className="w-3 h-3" />
+              AI Generation Pipeline
+            </div>
+            <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight">Create Presentation</h1>
+            <p className="text-lg text-slate-400">Describe a topic or upload a PDF. Two AI models do the rest.</p>
           </motion.div>
 
           {/* ─── Topic Input ─── */}

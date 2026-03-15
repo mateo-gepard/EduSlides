@@ -246,18 +246,18 @@ export default function PlayerPage() {
       >
         <button
           onClick={() => { stopAudio(); router.push('/create'); }}
-          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/[0.06]"
         >
           <ArrowLeft className="w-4 h-4" />
           Exit
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 px-4 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
           <Layers className="w-3.5 h-3.5 text-indigo-400" />
-          <span className="text-xs text-white/50 font-medium truncate max-w-[240px]">
+          <span className="text-xs text-white/60 font-medium truncate max-w-[280px]">
             {presentation.metadata.title}
           </span>
         </div>
-        <span className="text-xs text-white/40 font-mono tabular-nums">
+        <span className="text-xs text-white/40 font-mono tabular-nums px-3 py-1.5 rounded-lg bg-white/[0.04]">
           {currentIndex + 1} / {totalSlides}
         </span>
       </motion.div>

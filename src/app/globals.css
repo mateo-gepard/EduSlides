@@ -31,6 +31,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
   }
   body {
     background: var(--color-bg-primary);
@@ -81,7 +82,40 @@
       0 0 40px -8px var(--color-accent-glow);
   }
 
-  /* Mesh gradient background */
+  /* ─── Floating Orbs ─── */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    will-change: transform;
+  }
+  .orb-1 {
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+    top: -15%;
+    left: -10%;
+    animation: orbFloat1 20s ease-in-out infinite;
+  }
+  .orb-2 {
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+    top: 40%;
+    right: -15%;
+    animation: orbFloat2 25s ease-in-out infinite;
+  }
+  .orb-3 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+    bottom: -10%;
+    left: 30%;
+    animation: orbFloat3 30s ease-in-out infinite;
+  }
+
+  /* Mesh gradient background (legacy — for create/player pages) */
   .mesh-bg {
     position: fixed;
     inset: 0;
@@ -103,7 +137,7 @@
     background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
     top: -10%;
     left: -5%;
-    animation: meshMove 20s ease-in-out infinite;
+    animation: orbFloat1 20s ease-in-out infinite;
   }
   .mesh-bg::after {
     width: 500px;
@@ -111,7 +145,17 @@
     background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
     bottom: -10%;
     right: -5%;
-    animation: meshMove 25s ease-in-out infinite reverse;
+    animation: orbFloat2 25s ease-in-out infinite;
+  }
+
+  /* Hero gradient text */
+  .hero-gradient-text {
+    background: linear-gradient(135deg, #818cf8 0%, #a78bfa 25%, #c084fc 50%, #818cf8 75%, #60a5fa 100%);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 6s ease-in-out infinite;
   }
 
   /* Slide container */
@@ -241,11 +285,12 @@
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: var(--radius-lg);
     padding: 24px;
-    transition: all 0.25s ease;
+    transition: all 0.3s ease;
   }
   .card:hover {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.12);
     background: rgba(255, 255, 255, 0.04);
+    transform: translateY(-2px);
   }
 
   /* Quiz option */
@@ -294,4 +339,47 @@
   .delay-600 { animation-delay: 600ms; }
   .delay-700 { animation-delay: 700ms; }
   .delay-800 { animation-delay: 800ms; }
+}
+
+/* ─── Keyframe Animations ─── */
+@keyframes orbFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(80px, 40px) scale(1.05); }
+  66% { transform: translate(-40px, 80px) scale(0.95); }
+}
+
+@keyframes orbFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-60px, -50px) scale(1.08); }
+  66% { transform: translate(40px, -80px) scale(0.96); }
+}
+
+@keyframes orbFloat3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(50px, -30px) scale(1.04); }
+  66% { transform: translate(-70px, 20px) scale(0.97); }
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ─── Animation Utilities ─── */
+.animate-gradient-x {
+  animation: gradient-x 4s ease infinite;
+}
+
+.animate-ticker {
+  animation: ticker 30s linear infinite;
 }
