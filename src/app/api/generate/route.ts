@@ -20,11 +20,11 @@ const PRICING: Record<string, { input: number; output: number }> = {
   openai: { input: 2.5, output: 10.0 },         // GPT-4o
 };
 
-function calcCost(provider: string, promptTokens: number, completionTokens: number) {
+function calcCost(provider: string, inputTokens: number, outputTokens: number) {
   const p = PRICING[provider] ?? { input: 0, output: 0 };
-  const inputCost = (promptTokens / 1_000_000) * p.input;
-  const outputCost = (completionTokens / 1_000_000) * p.output;
-  return { inputCost, outputCost, total: inputCost + outputCost, promptTokens, completionTokens };
+  const inputCost = (inputTokens / 1_000_000) * p.input;
+  const outputCost = (outputTokens / 1_000_000) * p.output;
+  return { inputCost, outputCost, total: inputCost + outputCost, inputTokens, outputTokens };
 }
 
 function resolveKey(provider: string, clientKey?: string): string | undefined {
@@ -122,7 +122,7 @@ export async function POST(req: Request) {
 
       try {
         let presentationJson: string;
-        const costs: { phase: string; provider: string; inputCost: number; outputCost: number; total: number; promptTokens: number; completionTokens: number }[] = [];
+        const costs: { phase: string; provider: string; inputCost: number; outputCost: number; total: number; inputTokens: number; outputTokens: number }[] = [];
 
         if (usePipeline) {
           /* ═══════ TWO-PHASE PIPELINE ═══════ */
@@ -142,14 +142,14 @@ export async function POST(req: Request) {
               language,
               additionalContext,
             }),
-            maxTokens: 12000,
+            maxOutputTokens: 12000,
             temperature: 0.7,
           });
 
           const scriptCost = calcCost(
             scriptProvider,
-            scriptResult.usage?.promptTokens ?? 0,
-            scriptResult.usage?.completionTokens ?? 0,
+            scriptResult.usage?.inputTokens ?? 0,
+            scriptResult.usage?.outputTokens ?? 0,
           );
           costs.push({ phase: 'script', provider: scriptProvider, ...scriptCost });
 
@@ -171,14 +171,14 @@ export async function POST(req: Request) {
             model: designModel,
             system: buildDesignSystemPrompt(language),
             prompt: buildDesignUserPrompt(scriptJson, duration),
-            maxTokens: 16000,
+            maxOutputTokens: 16000,
             temperature: 0.5,
           });
 
           const designCost = calcCost(
             designProvider,
-            designResult.usage?.promptTokens ?? 0,
-            designResult.usage?.completionTokens ?? 0,
+            designResult.usage?.inputTokens ?? 0,
+            designResult.usage?.outputTokens ?? 0,
           );
           costs.push({ phase: 'design', provider: designProvider, ...designCost });
 
@@ -199,14 +199,14 @@ export async function POST(req: Request) {
               language,
               additionalContext,
             }),
-            maxTokens: 16000,
+            maxOutputTokens: 16000,
             temperature: 0.7,
           });
 
           const singleCost = calcCost(
             designProvider,
-            result.usage?.promptTokens ?? 0,
-            result.usage?.completionTokens ?? 0,
+            result.usage?.inputTokens ?? 0,
+            result.usage?.outputTokens ?? 0,
           );
           costs.push({ phase: 'single', provider: designProvider, ...singleCost });
 

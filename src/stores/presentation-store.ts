@@ -11,8 +11,8 @@ interface CostBreakdown {
   inputCost: number;
   outputCost: number;
   total: number;
-  promptTokens: number;
-  completionTokens: number;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 interface GenerationCost {

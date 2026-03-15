@@ -612,7 +612,7 @@ export default function CreatePage() {
                         <span>API Cost: ${generationCost.totalCost.toFixed(4)}</span>
                         {generationCost.costs.map((c) => (
                           <span key={c.phase} className="text-slate-600">
-                            {c.phase}: {c.promptTokens + c.completionTokens} tokens
+                            {c.phase}: {c.inputTokens + c.outputTokens} tokens
                           </span>
                         ))}
                       </div>
