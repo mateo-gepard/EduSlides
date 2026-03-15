@@ -6,6 +6,7 @@ import {
   buildScriptSystemPrompt,
   buildScriptUserPrompt,
   buildDesignSystemPrompt,
+  buildDesignSystemPromptCompact,
   buildDesignUserPrompt,
   buildSystemPrompt,
   buildUserPrompt,
@@ -61,6 +62,76 @@ function extractJson(text: string): string {
   const match = text.match(/\{[\s\S]*\}/);
   if (match) return match[0];
   return text;
+}
+
+/**
+ * Attempt to repair truncated JSON (e.g. when model hits output token limit).
+ * Closes unclosed strings, arrays, and objects.
+ */
+function repairJson(raw: string): string {
+  let json = extractJson(raw);
+
+  // Try parsing as-is first
+  try { JSON.parse(json); return json; } catch { /* needs repair */ }
+
+  // Remove trailing comma before repair
+  json = json.replace(/,\s*$/, '');
+
+  // Close unclosed strings
+  const quoteCount = (json.match(/(?<!\\)"/g) || []).length;
+  if (quoteCount % 2 !== 0) json += '"';
+
+  // Track open brackets
+  let openBraces = 0;
+  let openBrackets = 0;
+  let inString = false;
+  let prevChar = '';
+  for (const ch of json) {
+    if (ch === '"' && prevChar !== '\\') inString = !inString;
+    if (!inString) {
+      if (ch === '{') openBraces++;
+      else if (ch === '}') openBraces--;
+      else if (ch === '[') openBrackets++;
+      else if (ch === ']') openBrackets--;
+    }
+    prevChar = ch;
+  }
+
+  // Remove trailing comma again after quote fix
+  json = json.replace(/,\s*$/, '');
+
+  // Close open brackets and braces
+  for (let i = 0; i < openBrackets; i++) json += ']';
+  for (let i = 0; i < openBraces; i++) json += '}';
+
+  // Validate
+  try { JSON.parse(json); return json; } catch { /* still broken */ }
+
+  // Last resort: try trimming back to last complete array item
+  const lastGoodBrace = json.lastIndexOf('}');
+  if (lastGoodBrace > 0) {
+    let attempt = json.substring(0, lastGoodBrace + 1);
+    // Re-close
+    let ob = 0, oq = 0;
+    let inStr = false;
+    let prev = '';
+    for (const c of attempt) {
+      if (c === '"' && prev !== '\\') inStr = !inStr;
+      if (!inStr) {
+        if (c === '{') ob++;
+        else if (c === '}') ob--;
+        else if (c === '[') oq++;
+        else if (c === ']') oq--;
+      }
+      prev = c;
+    }
+    attempt = attempt.replace(/,\s*$/, '');
+    for (let i = 0; i < oq; i++) attempt += ']';
+    for (let i = 0; i < ob; i++) attempt += '}';
+    try { JSON.parse(attempt); return attempt; } catch { /* give up */ }
+  }
+
+  return json;
 }
 
 export async function POST(req: Request) {
@@ -157,7 +228,7 @@ export async function POST(req: Request) {
           );
           costs.push({ phase: 'script', provider: scriptProvider, ...scriptCost });
 
-          const scriptJson = extractJson(scriptResult.text);
+          const scriptJson = repairJson(scriptResult.text);
 
           try {
             JSON.parse(scriptJson);
@@ -170,13 +241,17 @@ export async function POST(req: Request) {
           // Phase 2: Design
           sendEvent('phase', { phase: 'designing', message: 'Designing visual slides...' });
 
+          const designMaxTokens = designProvider === 'anthropic-haiku' ? 8192 : 16000;
+          const designSystemPrompt = designProvider === 'anthropic-haiku'
+            ? buildDesignSystemPromptCompact(language)
+            : buildDesignSystemPrompt(language);
           const designModel = createModel(designProvider, designKey);
           const designResult = await generateText({
             model: designModel,
-            system: buildDesignSystemPrompt(language),
+            system: designSystemPrompt,
             prompt: buildDesignUserPrompt(scriptJson, duration),
-            maxOutputTokens: 16000,
-            temperature: 0.5,
+            maxOutputTokens: designMaxTokens,
+            temperature: 0.4,
           });
 
           const designCost = calcCost(
@@ -186,7 +261,7 @@ export async function POST(req: Request) {
           );
           costs.push({ phase: 'design', provider: designProvider, ...designCost });
 
-          presentationJson = extractJson(designResult.text);
+          presentationJson = repairJson(designResult.text);
         } else {
           /* ═══════ SINGLE-PASS FALLBACK ═══════ */
           sendEvent('phase', { phase: 'researching', message: 'Generating presentation...' });
@@ -214,11 +289,16 @@ export async function POST(req: Request) {
           );
           costs.push({ phase: 'single', provider: designProvider, ...singleCost });
 
-          presentationJson = extractJson(result.text);
+          presentationJson = repairJson(result.text);
         }
 
-        // Validate final JSON
+        // Validate final JSON (repair handles truncated output)
         const presentation = JSON.parse(presentationJson);
+
+        // Ensure slides array exists
+        if (!presentation.slides || !Array.isArray(presentation.slides) || presentation.slides.length === 0) {
+          throw new Error('Generation produced empty slides. Please retry.');
+        }
 
         const totalCost = costs.reduce((acc, c) => acc + c.total, 0);
         sendEvent('cost', { costs, totalCost });
