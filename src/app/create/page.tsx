@@ -120,11 +120,13 @@ export default function CreatePage() {
     abortRef.current = controller;
 
     try {
+      const effectiveTopic = config.topic.trim() || (pdfName ? pdfName.replace(/\.pdf$/i, '') : '');
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          topic: config.topic,
+          topic: effectiveTopic,
           subject: config.subject,
           depth: config.depth,
           duration: config.duration,

@@ -74,12 +74,12 @@ export function buildScriptUserPrompt(params: {
 
   return `Create a complete educational script.
 
-Topic: ${params.topic}
+${params.topic ? `Topic: ${params.topic}` : 'Topic: (derive from the source material below)'}
 ${params.subject ? `Subject area: ${params.subject}` : ''}
 Educational level: ${params.depth}
 Target duration: ${params.duration} minutes (approximately ${approxSections} sections)
 Language: ${params.language}
-${params.additionalContext ? `\nAdditional context / source material:\n${params.additionalContext}` : ''}
+${params.additionalContext ? `\nAdditional context / source material (use this as the primary content source if no specific topic was given):\n${params.additionalContext}` : ''}
 
 Generate the full JSON now.`;
 }

@@ -85,9 +85,9 @@ export async function POST(req: Request) {
     designApiKey?: string;
   };
 
-  if (!topic || !depth || !duration || !language) {
+  if ((!topic && !additionalContext) || !depth || !duration || !language) {
     return Response.json(
-      { error: 'Missing required fields: topic, depth, duration, language' },
+      { error: 'Please provide a topic or upload a PDF.' },
       { status: 400 },
     );
   }
