@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { usePresentationStore } from '@/stores/presentation-store';
 import SlideRenderer from '@/components/SlideRenderer';
+import SlideQA from '@/components/SlideQA';
 
 /* ─── Transition variants ─── */
 const transitionVariants: Record<string, object> = {
@@ -261,6 +262,15 @@ export default function PlayerPage() {
           {currentIndex + 1} / {totalSlides}
         </span>
       </motion.div>
+
+      {/* ─── AI Q&A popup ─── */}
+      {slide && presentation && (
+        <SlideQA
+          slide={slide}
+          presentationTitle={presentation.metadata.title}
+          language={presentation.metadata.language || 'English'}
+        />
+      )}
 
       {/* ─── Bottom controls ─── */}
       <motion.div

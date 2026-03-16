@@ -55,10 +55,10 @@ NEW: formula, graph, quote, infographic, image-spotlight, funfact, definition, c
 You MUST match visuals to the subject. Different subjects need DIFFERENT module mixes:
 
 MATH / PHYSICS / ENGINEERING:
-- HEAVILY use: formula (LaTeX equations, derivations), graph (animated function plots, data plots), data-table (values, calculations), process (proofs, derivations)
+- HEAVILY use: formula (LaTeX equations, derivations), graph (mathematical function plots with expressions like "x^2", "sin(x)"), data-table (values, calculations), process (proofs, derivations)
 - MODERATELY use: diagram (circuits, force diagrams), big-statement (key equations), stats, chart
 - RARELY use: funfact, image-spotlight, quote
-- When data exists: provide "data.formula" (LaTeX string like "E = mc^2" or "\\\\frac{-b \\\\pm \\\\sqrt{b^2-4ac}}{2a}"), "data.series" (graph points), "data.steps" (derivation steps)
+- When data exists: provide "data.formula" (LaTeX string), "data.functions" (array of math expressions like [{expression:"x^2", label:"f(x)=x²"}]), "data.xRange", "data.yRange", "data.steps" (derivation steps)
 
 HISTORY / SOCIAL SCIENCES / POLITICS:
 - HEAVILY use: timeline, image-spotlight (with imageQuery for historical photos), quote (from historical figures), funfact
@@ -102,7 +102,7 @@ RULES:
 - Use at LEAST 8 different visual types. Use the NEW types (formula, graph, quote, infographic, image-spotlight, funfact, definition, code) when they match the subject.
 - The "data" field supplies structured information the designer needs. Be thorough:
   * For formula: provide "formula" (LaTeX string) and optionally "steps" array
-  * For graph: provide "series" array of {label, points:[{x,y}]} and "xLabel"/"yLabel"
+  * For graph: provide "functions" array with math "expression" (e.g. "x^2", "sin(x)"), "xRange", "yRange", and optionally "dataPoints" for measured values
   * For quote: provide "quote", "author", "role", "year"
   * For definition: provide "terms" array with "term", "definition", "example"
   * For code: provide "language", "code", "explanation"
@@ -259,9 +259,9 @@ Columns: 2-3 items.
 IMPORTANT: "formula" and "steps[].formula" are LaTeX strings. Use valid LaTeX: \\\\frac{}{}, \\\\sqrt{}, ^{}, _{}, \\\\text{}, \\\\cdot, \\\\times, \\\\int, \\\\sum, \\\\alpha, \\\\beta, etc.
 Steps are optional — use them for derivations, proofs, or worked examples.
 
-19. "graph" — Animated line/scatter/area plot
-{ "type":"graph", "chapter":"04", "heading":"...", "graphType":"line|scatter|area|multi-line", "xLabel":"X Axis", "yLabel":"Y Axis", "series":[{"label":"Series 1","color":"#hex","points":[{"x":0,"y":0},{"x":1,"y":2.5},{"x":2,"y":6}]}], "annotations":[{"x":1.5,"y":4,"text":"Peak","color":"#hex"}], "source":"Data source (optional)" }
-IMPORTANT: Points must have NUMERIC x and y values. Provide at LEAST 5 points per series for smooth curves. Use real data from the script.
+19. "graph" — Mathematical function plotter & data plot
+{ "type":"graph", "chapter":"04", "heading":"...", "graphType":"function|data|multi", "xLabel":"x", "yLabel":"f(x)", "xRange":[-10,10], "yRange":[-5,5], "functions":[{"expression":"x^2","label":"f(x) = x\u00b2","color":"#7c3aed","dashed":false}], "dataPoints":[{"label":"Measured","color":"#f59e0b","points":[{"x":1,"y":1.2},{"x":2,"y":3.8}],"showLine":true}], "annotations":[{"x":0,"y":0,"text":"Origin","color":"#hex"}], "gridLines":true, "source":"(optional)" }
+IMPORTANT: "functions[].expression" is a MATH EXPRESSION with variable x. Supported: +, -, *, /, ^, sqrt(), abs(), sin(), cos(), tan(), log(), ln(), exp(), pi, e. Examples: "x^2", "sin(x)", "2*x+1", "sqrt(x)", "x^3-3*x", "1/x", "exp(-x^2)". Always provide xRange and yRange for functions. For pure data plots use dataPoints with showLine.
 
 20. "quote" — Blockquote with attribution
 { "type":"quote", "chapter":"02", "heading":"...", "quote":"The actual quote text", "author":"Person Name", "role":"Title/Role (optional)", "year":"Year (optional)", "context":"Why this quote matters (optional)", "accent":"#hex" }
@@ -368,7 +368,7 @@ CONTENT:
 - Sources: from script's sources array.
 - Text: proper capitalization, complete sentences, no abbreviations in headings.
 - LaTeX formulas: use proper syntax (\\\\frac, \\\\sqrt, \\\\int, \\\\sum, Greek letters, etc.).
-- Graph data: use REAL numeric values from the script, not made-up data.
+- Graph: use mathematical expressions in functions[].expression (e.g. "x^2", "sin(x)", "exp(-x^2)"). Always set xRange and yRange. For data plots use dataPoints.
 - Code: preserve exact code from script data, use \\n for line breaks.
 
 IMAGES:
@@ -384,54 +384,35 @@ IMAGES:
 export function buildDesignSystemPromptCompact(language: string): string {
   return `You are a presentation designer. Transform a JSON educational script into final slide JSON.
 
-OUTPUT: valid JSON only — no markdown, no commentary, no trailing commas.
+CRITICAL: Output ONLY valid JSON — no markdown fences, no commentary, no trailing commas. Maximum 8 slides total.
 
 FORMAT:
-{"metadata":{"title":"str","subtitle":"str","subject":"str","level":"str","language":"${language}","estimatedDuration":<min>,"totalSlides":<n>,"accentColor":"#hex"},"slides":[<Slide>]}
+{"metadata":{"title":"str","subtitle":"str","subject":"str","level":"str","language":"${language}","estimatedDuration":<min>,"totalSlides":<n>,"accentColor":"#hex"},"slides":[...]}
 
-SLIDE: {"id":"slide-<i>","index":<n>,"type":"<Type>","transition":"fade|slide|zoom|scale","duration":<sec>,"background":"<LIGHT CSS gradient>","content":{...},"narration":[{"t":<sec>,"text":"subtitle line"}],"imageQuery":"optional"}
+SLIDE: {"id":"slide-<i>","index":<n>,"type":"<Type>","transition":"fade","duration":<sec>,"background":"<LIGHT gradient>","content":{...},"narration":[{"t":0,"text":".."},{"t":5,"text":".."}]}
 
-Narration: split script narration into cues. t=0 first. Space 3-6s apart. Duration = cues × spacing.
+TYPES (use the appropriate schema):
+title: {"type":"title","badge":"..","title":"TITLE","subtitle":"..","meta":[{"icon":"book","text":".."}]}
+big-statement: {"type":"big-statement","chapter":"..","heading":"..","statement":"..","description":"..","accent":"#hex"}
+info-grid: {"type":"info-grid","chapter":"..","heading":"..","cards":[{"icon":"..","color":"#hex","title":"..","text":".."}]}
+process: {"type":"process","chapter":"..","heading":"..","steps":[{"label":"1","name":"..","description":"..","color":"#hex"}]}
+stats: {"type":"stats","chapter":"..","heading":"..","items":[{"icon":"..","value":100,"suffix":"+","label":"..","color":"#hex"}]}
+list: {"type":"list","chapter":"..","heading":"..","accent":"#hex","items":[{"title":"..","text":".."}]}
+comparison: {"type":"comparison","chapter":"..","heading":"..","columns":[{"title":"..","color":"#hex","points":["..",".."]},{"title":"..","color":"#hex","points":["..",".."]},]}
+quiz: {"type":"quiz","chapter":"..","heading":"Quiz","questions":[{"question":"..","options":["A","B","C","D"],"correctIndex":1,"explanation":".."}]}
+summary: {"type":"summary","chapter":"..","heading":"Takeaways","items":[{"icon":"..","title":"..","text":".."}]}
+outro: {"type":"outro","icon":"check","title":"Thank You","message":"..","sources":["citation"]}
+formula: {"type":"formula","chapter":"..","heading":"..","formula":"LaTeX","description":"..","accent":"#hex"}
+graph: {"type":"graph","chapter":"..","heading":"..","graphType":"function","xLabel":"x","yLabel":"y","xRange":[-10,10],"yRange":[-5,5],"functions":[{"expression":"x^2","label":"f(x)=x²","color":"#hex"}]}
+quote: {"type":"quote","chapter":"..","heading":"..","quote":"..","author":"..","accent":"#hex"}
+definition: {"type":"definition","chapter":"..","heading":"..","terms":[{"term":"..","definition":"..","color":"#hex"}]}
 
-═══ 25 TYPES — EXACT SCHEMAS ═══
-
-1. title: {"type":"title","badge":"Subject · Level","title":"TITLE","subtitle":"tag","meta":[{"icon":"icon-name","text":"label"}]}
-2. big-statement: {"type":"big-statement","chapter":"03","heading":"..","statement":"E=mc²","description":"..","source":"..","accent":"#hex"}
-3. info-grid: {"type":"info-grid","chapter":"01","heading":"..","cards":[{"icon":"icon-name","color":"#hex","title":"..","text":"..","highlight":{"text":"..","source":".."}}]}
-4. diagram: {"type":"diagram","chapter":"02","heading":"..","layout":"body|radial|scatter|flow|layers","centerLabel":"..","nodes":[{"id":"n1","x":50,"y":10,"label":"..","color":"#hex","size":"md"}],"connections":[{"from":"n1","to":"n2","label":"..","style":"arrow"}],"infoList":[{"nodeId":"n1","label":"..","description":"..","value":"68%","color":"#hex"}]}
-5. data-table: {"type":"data-table","chapter":"03","heading":"..","headers":[".."],"rows":[{"cells":[".."],"badge":{"text":"..","level":"low|med|high|critical|max"}}],"example":{"title":"..","description":"..","items":[{"label":"..","value":"4","color":"#hex"}],"formula":"..","result":{"value":"25","label":"Result"}}}
-6. process: {"type":"process","chapter":"04","heading":"..","description":"..","steps":[{"label":"1","name":"Step","description":"..","color":"#hex"}]}
-7. timeline: {"type":"timeline","chapter":"05","heading":"..","events":[{"time":"1905","icon":"icon-name","title":"..","description":"..","color":"#hex"}],"sideChart":{"title":"..","bars":[{"label":"..","displayValue":"95%","percent":95,"color":"#hex"}]}}
-8. cycle: {"type":"cycle","chapter":"06","heading":"..","centerLabel":"NAME","centerSub":"..","nodes":[{"icon":"icon-name","value":"..","label":"..","description":"..","color":"#hex"}]}
-9. stats: {"type":"stats","chapter":"07","heading":"..","items":[{"icon":"icon-name","value":35000,"suffix":"+","label":"..","color":"#hex"}]}
-10. ranked: {"type":"ranked","chapter":"08","heading":"..","items":[{"icon":"icon-name","title":"..","description":"..","percent":92,"percentLabel":"Very High","color":"#hex"}]}
-11. scenario: {"type":"scenario","chapter":"10","heading":"..","subject":{"icon":"icon-name","title":"..","description":".."},"steps":[{"badge":"Step 1","color":"#hex","text":".."}]}
-12. list: {"type":"list","chapter":"09","heading":"..","accent":"#hex","items":[{"title":"..","text":".."}]}
-13. chart: {"type":"chart","chapter":"05","heading":"..","chartType":"bar|pie","source":"..","bars":[{"label":"..","displayValue":"95%","percent":95,"color":"#hex"}],"segments":[{"label":"..","value":45,"color":"#hex"}],"centerLabel":"Total"}
-14. comparison: {"type":"comparison","chapter":"02","heading":"..","columns":[{"title":"A","color":"#hex","points":["Point 1","Point 2"]}]}
-15. quiz: {"type":"quiz","chapter":"11","heading":"Knowledge Check","questions":[{"question":"..","options":["A","B","C","D"],"correctIndex":1,"explanation":".."}]}
-16. summary: {"type":"summary","chapter":"12","heading":"Key Takeaways","items":[{"icon":"icon-name","title":"..","text":".."}]}
-17. outro: {"type":"outro","icon":"icon-name","title":"Thank You","message":"closing","sources":["APA citation"]}
-18. formula: {"type":"formula","chapter":"03","heading":"..","formula":"LaTeX string","description":"..","steps":[{"label":"1","formula":"LaTeX","explanation":".."}],"accent":"#hex"}
-19. graph: {"type":"graph","chapter":"04","heading":"..","graphType":"line|scatter|area|multi-line","xLabel":"..","yLabel":"..","series":[{"label":"..","color":"#hex","points":[{"x":0,"y":0},{"x":1,"y":2.5}]}],"annotations":[{"x":1,"y":2,"text":"..","color":"#hex"}],"source":".."}
-20. quote: {"type":"quote","chapter":"02","heading":"..","quote":"..","author":"..","role":"..","year":"..","context":"..","accent":"#hex"}
-21. infographic: {"type":"infographic","chapter":"05","heading":"..","layout":"vertical|horizontal|centered","items":[{"icon":"icon-name","value":"3.8B","label":"..","description":"..","color":"#hex"}]}
-22. image-spotlight: {"type":"image-spotlight","chapter":"06","heading":"..","imageQuery":"specific search query","caption":"..","description":"..","overlayPosition":"bottom-left|bottom-right|top-left|center","kenBurns":"zoom-in|zoom-out|pan-left|pan-right"}
-23. funfact: {"type":"funfact","chapter":"07","heading":"..","icon":"icon-name","fact":"..","explanation":"..","source":"..","accent":"#hex"}
-24. definition: {"type":"definition","chapter":"01","heading":"Key Terms","terms":[{"term":"..","pronunciation":"..","partOfSpeech":"noun","definition":"..","example":"..","relatedTerms":[".."],"color":"#hex"}]}
-25. code: {"type":"code","chapter":"08","heading":"..","language":"python","code":"code with \\n newlines","highlights":[3,4],"explanation":"..","output":"..","accent":"#hex"}
-
-═══ RULES ═══
-- First=title, last=outro, second-to-last=summary. Quiz every 3-4 slides.
-- Use 10+ distinct types. Match types to subject:
-  MATH/PHYSICS → formula, graph, data-table heavily. HISTORY → timeline, image-spotlight, quote, funfact. BIOLOGY → diagram, infographic, process, cycle, definition. CS/TECH → code, diagram, graph. LITERATURE → quote, definition, big-statement. ECONOMICS → chart, graph, stats.
-- LIGHT backgrounds only (soft pastels). NEVER dark. Vary per slide.
-- NO emoji anywhere. Icon fields use names: atom, beaker, brain, heart, calculator, chart, clock, book, globe, cpu, code, shield, eye, award, lightbulb, arrow-right, check, layers, sparkles, etc.
-- All data from script. Narration from script. Quiz from quizQuestions. Sources from script.
-- LaTeX: use \\\\frac{}{}, \\\\sqrt{}, ^{}, _{}, \\\\text{}, Greek letters etc.
-- Graph points: NUMERIC x,y. At least 5 points per series.
-- Code: use \\n for newlines.
-- Preserve imageQuery from script sections.`;
+RULES:
+- First=title, last=outro, before-last=summary. Max 8 slides.
+- LIGHT backgrounds only. NO dark colors. NO emoji.
+- Keep narration SHORT: max 2 cues per slide, each 1 sentence.
+- All content from the script. Do not hallucinate.
+- Icon names: atom, brain, heart, book, globe, chart, lightbulb, check, sparkles, calculator, clock, eye, shield, star, award`;
 }
 
 export function buildDesignUserPrompt(scriptJson: string, duration: number): string {
@@ -443,6 +424,35 @@ SCRIPT:
 ${scriptJson}
 
 Generate the full presentation JSON now.`;
+}
+
+/**
+ * Compact design user prompt for Haiku — trims the script to reduce output size.
+ * Limits sections and tells the model to keep output small.
+ */
+export function buildDesignUserPromptCompact(scriptJson: string, duration: number): string {
+  // Parse script and limit sections to prevent output overflow
+  let script;
+  try { script = JSON.parse(scriptJson); } catch { script = null; }
+
+  if (script?.sections && script.sections.length > 6) {
+    script.sections = script.sections.slice(0, 6);
+  }
+  if (script?.quizQuestions && script.quizQuestions.length > 2) {
+    script.quizQuestions = script.quizQuestions.slice(0, 2);
+  }
+  if (script?.sources && script.sources.length > 3) {
+    script.sources = script.sources.slice(0, 3);
+  }
+
+  const trimmed = script ? JSON.stringify(script) : scriptJson;
+
+  return `Transform this script into slide JSON. Maximum 8 slides total (including title, summary, outro). Keep narration arrays SHORT (max 2 cues per slide). Duration: ${duration} min.
+
+SCRIPT:
+${trimmed}
+
+Generate compact JSON now.`;
 }
 
 /* ═══════════════════════════════════════
@@ -476,7 +486,7 @@ SLIDE: { "id":"slide-<i>", "index":<n>, "type":"<SlideType>", "transition":"fade
 
 NEW TYPES QUICK REFERENCE:
 - formula: {"type":"formula","chapter":"..","heading":"..","formula":"LaTeX string","description":"..","steps":[{"label":"1","formula":"LaTeX","explanation":".."}],"accent":"#hex"}
-- graph: {"type":"graph","chapter":"..","heading":"..","graphType":"line|scatter|area|multi-line","xLabel":"..","yLabel":"..","series":[{"label":"..","color":"#hex","points":[{"x":0,"y":0}]}],"source":".."}
+- graph: {"type":"graph","chapter":"..","heading":"..","graphType":"function|data|multi","xLabel":"x","yLabel":"f(x)","xRange":[-10,10],"yRange":[-5,5],"functions":[{"expression":"x^2","label":"f(x)=x\u00b2","color":"#hex"}],"dataPoints":[{"label":"..","color":"#hex","points":[{"x":0,"y":0}],"showLine":true}],"source":".."}
 - quote: {"type":"quote","chapter":"..","heading":"..","quote":"..","author":"..","role":"..","year":"..","context":"..","accent":"#hex"}
 - infographic: {"type":"infographic","chapter":"..","heading":"..","layout":"vertical|horizontal|centered","items":[{"icon":"..","value":"..","label":"..","description":"..","color":"#hex"}]}
 - image-spotlight: {"type":"image-spotlight","chapter":"..","heading":"..","imageQuery":"specific search query","caption":"..","description":"..","overlayPosition":"bottom-left","kenBurns":"zoom-in|zoom-out|pan-left|pan-right"}

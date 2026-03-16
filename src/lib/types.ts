@@ -376,20 +376,30 @@ export interface FormulaContent {
   accent: string;
 }
 
-/** Animated line/scatter/area graph with labeled axes */
+/** Mathematical function graph / data plot with labeled axes */
 export interface GraphContent {
   type: 'graph';
   chapter: string;
   heading: string;
-  graphType: 'line' | 'scatter' | 'area' | 'multi-line';
+  graphType: 'function' | 'data' | 'multi';
   xLabel: string;
   yLabel: string;
-  series: {
+  xRange?: [number, number];
+  yRange?: [number, number];
+  functions?: {
+    expression: string;   // e.g. "x^2", "sin(x)", "2*x+1"
+    label: string;        // e.g. "f(x) = x²"
+    color: string;
+    dashed?: boolean;
+  }[];
+  dataPoints?: {
     label: string;
     color: string;
     points: { x: number; y: number }[];
+    showLine?: boolean;
   }[];
   annotations?: { x: number; y: number; text: string; color: string }[];
+  gridLines?: boolean;
   source?: string;
 }
 

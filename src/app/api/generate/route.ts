@@ -8,6 +8,7 @@ import {
   buildDesignSystemPrompt,
   buildDesignSystemPromptCompact,
   buildDesignUserPrompt,
+  buildDesignUserPromptCompact,
   buildSystemPrompt,
   buildUserPrompt,
 } from '@/lib/prompts';
@@ -18,7 +19,7 @@ export const maxDuration = 180;
 const PRICING: Record<string, { input: number; output: number }> = {
   gemini: { input: 1.25, output: 10.0 },              // Gemini 3.1 Pro
   anthropic: { input: 3.0, output: 15.0 },             // Claude Sonnet 4
-  'anthropic-haiku': { input: 0.80, output: 4.0 },     // Claude Haiku 4
+  'anthropic-haiku': { input: 0.25, output: 1.25 },     // Claude 3 Haiku
   openai: { input: 2.5, output: 10.0 },                // GPT-4o
 };
 
@@ -50,7 +51,7 @@ function createModel(provider: string, apiKey: string): any {
     case 'anthropic':
       return createAnthropic({ apiKey })('claude-sonnet-4-20250514');
     case 'anthropic-haiku':
-      return createAnthropic({ apiKey })('claude-haiku-4-20250414');
+      return createAnthropic({ apiKey })('claude-3-haiku-20240307');
     case 'openai':
       return createOpenAI({ apiKey })('gpt-4o');
     default:
@@ -245,11 +246,14 @@ export async function POST(req: Request) {
           const designSystemPrompt = designProvider === 'anthropic-haiku'
             ? buildDesignSystemPromptCompact(language)
             : buildDesignSystemPrompt(language);
+          const designUserPrompt = designProvider === 'anthropic-haiku'
+            ? buildDesignUserPromptCompact(scriptJson, duration)
+            : buildDesignUserPrompt(scriptJson, duration);
           const designModel = createModel(designProvider, designKey);
           const designResult = await generateText({
             model: designModel,
             system: designSystemPrompt,
-            prompt: buildDesignUserPrompt(scriptJson, duration),
+            prompt: designUserPrompt,
             maxOutputTokens: designMaxTokens,
             temperature: 0.4,
           });
@@ -306,7 +310,7 @@ export async function POST(req: Request) {
         sendEvent('result', { presentation });
         controller.close();
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Generation failed';
+        const message = err instanceof Error ? err.message : String(err);
         sendEvent('error', { error: message });
         controller.close();
       }
