@@ -204,6 +204,33 @@ export async function POST(req: Request) {
         });
       }
 
+      async function runWithTimeoutAndHeartbeat<T>(
+        label: string,
+        timeoutMs: number,
+        fn: () => Promise<T>,
+      ): Promise<T> {
+        const started = Date.now();
+        const heartbeatMs = 15_000;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        const heartbeat = setInterval(() => {
+          const elapsed = Math.round((Date.now() - started) / 1000);
+          sendDebug(`${label} still running...`, { elapsedSeconds: elapsed });
+        }, heartbeatMs);
+
+        const timeout = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s`));
+          }, timeoutMs);
+        });
+
+        try {
+          return await Promise.race([fn(), timeout]);
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
+          clearInterval(heartbeat);
+        }
+      }
+
       try {
         let presentationJson: string;
         const costs: { phase: string; provider: string; inputCost: number; outputCost: number; total: number; inputTokens: number; outputTokens: number }[] = [];
@@ -287,13 +314,54 @@ export async function POST(req: Request) {
             provider: designProvider,
             maxOutputTokens: designMaxTokens,
           });
-          const designResult = await generateText({
-            model: designModel,
-            system: designSystemPrompt,
-            prompt: designUserPrompt,
-            maxOutputTokens: designMaxTokens,
-            temperature: 0.4,
-          });
+          const designTimeoutMs = 180_000;
+          let designResult: Awaited<ReturnType<typeof generateText>> | null = null;
+          let designError: Error | null = null;
+
+          const attemptTokenBudgets = [
+            designMaxTokens,
+            Math.max(6000, Math.floor(designMaxTokens * 0.7)),
+          ];
+
+          for (let attempt = 0; attempt < attemptTokenBudgets.length; attempt++) {
+            const maxTokens = attemptTokenBudgets[attempt];
+            if (attempt > 0) {
+              sendEvent('phase', { phase: 'designing', message: 'Designing visual slides... (retrying with tighter output budget)' });
+              sendDebug('Retrying design model after previous failure', {
+                attempt: attempt + 1,
+                maxOutputTokens: maxTokens,
+              }, 'warn');
+            }
+
+            try {
+              designResult = await runWithTimeoutAndHeartbeat(
+                `Design model attempt ${attempt + 1}`,
+                designTimeoutMs,
+                () => generateText({
+                  model: designModel,
+                  system: designSystemPrompt,
+                  prompt: designUserPrompt,
+                  maxOutputTokens: maxTokens,
+                  temperature: 0.4,
+                }),
+              );
+              designError = null;
+              break;
+            } catch (err) {
+              designError = err instanceof Error ? err : new Error(String(err));
+              sendDebug('Design model attempt failed', {
+                attempt: attempt + 1,
+                error: designError.message,
+              }, 'warn');
+            }
+          }
+
+          if (!designResult) {
+            throw new Error(
+              `Design generation failed after retries. Last error: ${designError?.message ?? 'unknown error'}. ` +
+              'Try reducing duration or switch Design Provider to "Claude Haiku 4" for faster responses.',
+            );
+          }
 
           sendDebug('Design model response received', {
             provider: designProvider,
