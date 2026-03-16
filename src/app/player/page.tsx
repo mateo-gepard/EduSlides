@@ -52,10 +52,16 @@ export default function PlayerPage() {
   const [showControls, setShowControls] = useState(true);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const ttsGeneratingRef = useRef<Set<string>>(new Set());
+  const [audioMinDuration, setAudioMinDuration] = useState(0);
 
   const slides = presentation?.slides || [];
   const slide = slides[currentIndex];
   const totalSlides = slides.length;
+  const effectiveSlideDuration = Math.max(slide?.duration || 0, audioMinDuration);
+
+  useEffect(() => {
+    setAudioMinDuration(0);
+  }, [currentIndex]);
 
   /* ─── Lock body scroll ─── */
   useEffect(() => {
@@ -97,19 +103,20 @@ export default function PlayerPage() {
   useEffect(() => {
     if (!slide?.narration?.length || !showSubtitles) { setSubtitle(''); return; }
     const cues = slide.narration;
+    const cueElapsed = audioMap[slide.id] ? Math.max(0, elapsed - 2) : elapsed;
     let current = '';
-    for (const cue of cues) { if (elapsed >= cue.t) current = cue.text; }
+    for (const cue of cues) { if (cueElapsed >= cue.t) current = cue.text; }
     setSubtitle(current);
-  }, [elapsed, slide, showSubtitles]);
+  }, [elapsed, slide, showSubtitles, audioMap]);
 
   /* ─── Auto-advance ─── */
   useEffect(() => {
     if (!isPlaying || !slide) return;
-    if (elapsed >= slide.duration) {
+    if (elapsed >= effectiveSlideDuration) {
       if (currentIndex < totalSlides - 1) store.next();
       else store.setIsPlaying(false);
     }
-  }, [elapsed, isPlaying, slide, currentIndex, totalSlides, store]);
+  }, [elapsed, isPlaying, effectiveSlideDuration, currentIndex, totalSlides, store, slide]);
 
   /* ─── Audio / TTS playback ─── */
   const stopAudio = useCallback(() => {
@@ -120,6 +127,7 @@ export default function PlayerPage() {
   useEffect(() => {
     stopAudio();
     if (!slide || !isPlaying) return;
+    let startTimer: ReturnType<typeof setTimeout> | null = null;
 
     const playBrowserTts = () => {
       if (!slide.narration?.length) return;
@@ -138,7 +146,14 @@ export default function PlayerPage() {
       const audio = new Audio(audioUrl);
       audio.volume = volume;
       audioRef.current = audio;
-      audio.play().catch(() => {});
+      audio.preload = 'metadata';
+      audio.onloadedmetadata = () => {
+        const minDur = Math.ceil(audio.duration + 4); // 2s lead-in + 2s tail buffer
+        if (Number.isFinite(minDur) && minDur > 0) setAudioMinDuration(minDur);
+      };
+      startTimer = setTimeout(() => {
+        audio.play().catch(() => {});
+      }, 2000);
     } else if (config.ttsProvider !== 'browser' && slide.narration?.length) {
       if (!ttsGeneratingRef.current.has(slide.id)) {
         ttsGeneratingRef.current.add(slide.id);
@@ -160,7 +175,14 @@ export default function PlayerPage() {
               const audio = new Audio(generatedUrl);
               audio.volume = volume;
               audioRef.current = audio;
-              audio.play().catch(() => {});
+              audio.preload = 'metadata';
+              audio.onloadedmetadata = () => {
+                const minDur = Math.ceil(audio.duration + 4); // 2s lead-in + 2s tail buffer
+                if (Number.isFinite(minDur) && minDur > 0) setAudioMinDuration(minDur);
+              };
+              setTimeout(() => {
+                audio.play().catch(() => {});
+              }, 2000);
             }
           })
           .catch(() => {
@@ -173,7 +195,10 @@ export default function PlayerPage() {
     } else if (slide.narration?.length) {
       playBrowserTts();
     }
-    return stopAudio;
+    return () => {
+      if (startTimer) clearTimeout(startTimer);
+      stopAudio();
+    };
   }, [currentIndex, isPlaying, audioMap, slide, volume, stopAudio, config.ttsProvider, store]);
 
   useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, [volume]);
@@ -220,7 +245,7 @@ export default function PlayerPage() {
 
   const trans = slide.transition || 'fade';
   const v = variants[trans] || variants.fade;
-  const progress = slide.duration > 0 ? Math.min(elapsed / slide.duration, 1) : 0;
+  const progress = effectiveSlideDuration > 0 ? Math.min(elapsed / effectiveSlideDuration, 1) : 0;
   return (
     <div
       className="player-shell"
@@ -349,8 +374,8 @@ export default function PlayerPage() {
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                slideStartRef.current = Date.now() - pct * (slide.duration * 1000);
-                setElapsed(pct * slide.duration);
+                slideStartRef.current = Date.now() - pct * (effectiveSlideDuration * 1000);
+                setElapsed(pct * effectiveSlideDuration);
               }}
             >
               <div className="player-progress-fill" style={{ width: `${progress * 100}%` }}>
@@ -384,7 +409,7 @@ export default function PlayerPage() {
 
             {/* Time */}
             <span className="text-[11px] sm:text-xs text-white/40 font-mono tabular-nums ml-1 select-none">
-              {fmt(elapsed)} / {fmt(slide.duration)}
+              {fmt(elapsed)} / {fmt(effectiveSlideDuration)}
             </span>
 
             <div className="flex-1" />

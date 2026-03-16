@@ -323,8 +323,9 @@ export default function CreatePage() {
                       // Orient slide duration by generated audio length (with thinking/pause room).
                       const audioDuration = await getAudioDurationSeconds(url);
                       if (audioDuration > 0) {
-                        const orientedDuration = Math.round((audioDuration * 1.18) + 1.5);
-                        slide.duration = Math.max(8, Math.min(45, orientedDuration));
+                        const minFromAudio = Math.ceil(audioDuration + 4); // 2s start + 2s end buffer
+                        const orientedDuration = Math.round((audioDuration * 1.08) + 4);
+                        slide.duration = Math.max(slide.duration || 0, minFromAudio, orientedDuration);
                       }
                     }
                   } catch {
