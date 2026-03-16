@@ -82,37 +82,37 @@ export default function SlideQA({ slide, presentationTitle, language }: SlideQAP
       {/* Toggle button */}
       <motion.button
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-24 right-5 z-40 w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg flex items-center justify-center transition-colors"
+        className="fixed bottom-[88px] right-4 z-40 w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 backdrop-blur-md border border-white/10 text-white/60 hover:text-white shadow-lg flex items-center justify-center transition-colors"
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
         title="Ask a question about this slide"
       >
-        {open ? <X className="w-5 h-5" /> : <MessageCircleQuestion className="w-5 h-5" />}
+        {open ? <X className="w-4 h-4" /> : <MessageCircleQuestion className="w-4 h-4" />}
       </motion.button>
 
       {/* Chat panel */}
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            initial={{ opacity: 0, y: 16, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            exit={{ opacity: 0, y: 16, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-40 right-5 z-40 w-80 max-h-[400px] rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden"
+            className="fixed bottom-[136px] right-4 z-40 w-80 max-h-[380px] rounded-xl bg-[#0f1629]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-purple-50">
-              <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                <MessageCircleQuestion className="w-4 h-4 text-indigo-600" />
+            <div className="px-4 py-3 border-b border-white/[0.06] bg-white/[0.02]">
+              <h3 className="text-sm font-semibold text-white/90 flex items-center gap-2">
+                <MessageCircleQuestion className="w-4 h-4 text-indigo-400" />
                 Ask Gemini
               </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">Questions about the current slide</p>
+              <p className="text-[11px] text-white/40 mt-0.5">Questions about the current slide</p>
             </div>
 
             {/* Messages */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-[120px] max-h-[260px]">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-[120px] max-h-[240px]">
               {messages.length === 0 && (
-                <p className="text-xs text-slate-400 text-center mt-6">
+                <p className="text-xs text-white/30 text-center mt-6">
                   Ask anything about this slide...
                 </p>
               )}
@@ -120,16 +120,14 @@ export default function SlideQA({ slide, presentationTitle, language }: SlideQAP
                 <div
                   key={i}
                   className={`text-sm leading-relaxed ${
-                    msg.role === 'user'
-                      ? 'text-right'
-                      : 'text-left'
+                    msg.role === 'user' ? 'text-right' : 'text-left'
                   }`}
                 >
                   <span
                     className={`inline-block px-3 py-2 rounded-xl max-w-[90%] ${
                       msg.role === 'user'
                         ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-100 text-slate-800'
+                        : 'bg-white/[0.06] text-white/80'
                     }`}
                   >
                     {msg.text}
@@ -138,7 +136,7 @@ export default function SlideQA({ slide, presentationTitle, language }: SlideQAP
               ))}
               {loading && (
                 <div className="text-left">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 text-sm">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.06] text-white/50 text-sm">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     Thinking...
                   </span>
@@ -147,7 +145,7 @@ export default function SlideQA({ slide, presentationTitle, language }: SlideQAP
             </div>
 
             {/* Input */}
-            <div className="px-3 py-2.5 border-t border-slate-100 flex items-center gap-2">
+            <div className="px-3 py-2.5 border-t border-white/[0.06] flex items-center gap-2">
               <input
                 ref={inputRef}
                 type="text"
@@ -155,12 +153,12 @@ export default function SlideQA({ slide, presentationTitle, language }: SlideQAP
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && ask()}
                 placeholder="Type your question..."
-                className="flex-1 text-sm px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-slate-800 placeholder-slate-400"
+                className="flex-1 text-sm px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/30 text-white/80 placeholder-white/30"
               />
               <button
                 onClick={ask}
                 disabled={!input.trim() || loading}
-                className="w-8 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-300 text-white flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-white/[0.06] disabled:text-white/20 text-white flex items-center justify-center transition-colors"
               >
                 <Send className="w-3.5 h-3.5" />
               </button>

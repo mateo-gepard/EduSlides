@@ -14,19 +14,27 @@ import {
   Maximize,
   Minimize,
   ArrowLeft,
-  Layers,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { usePresentationStore } from '@/stores/presentation-store';
 import SlideRenderer from '@/components/SlideRenderer';
 import SlideQA from '@/components/SlideQA';
 
 /* ─── Transition variants ─── */
-const transitionVariants: Record<string, object> = {
-  fade: { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } },
-  slide: { initial: { opacity: 0, x: 80 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -80 } },
-  zoom: { initial: { opacity: 0, scale: 1.1 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: 0.9 } },
-  scale: { initial: { opacity: 0, scale: 0.85 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: 1.1 } },
+const variants: Record<string, object> = {
+  fade:  { initial: { opacity: 0 },              animate: { opacity: 1 },            exit: { opacity: 0 } },
+  slide: { initial: { opacity: 0, x: 60 },       animate: { opacity: 1, x: 0 },     exit: { opacity: 0, x: -60 } },
+  zoom:  { initial: { opacity: 0, scale: 1.08 }, animate: { opacity: 1, scale: 1 },  exit: { opacity: 0, scale: 0.92 } },
+  scale: { initial: { opacity: 0, scale: 0.9 },  animate: { opacity: 1, scale: 1 },  exit: { opacity: 0, scale: 1.08 } },
 };
+
+/* ─── Format seconds → "0:05" ─── */
+function fmt(s: number) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
 
 export default function PlayerPage() {
   const router = useRouter();
@@ -42,11 +50,23 @@ export default function PlayerPage() {
   const [subtitle, setSubtitle] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showThumbnails, setShowThumbnails] = useState(false);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const slides = presentation?.slides || [];
   const slide = slides[currentIndex];
   const totalSlides = slides.length;
+
+  /* ─── Lock body scroll ─── */
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+      document.documentElement.style.overflow = '';
+    };
+  }, []);
 
   /* ─── No presentation → redirect ─── */
   useEffect(() => {
@@ -60,21 +80,16 @@ export default function PlayerPage() {
     setElapsed(0);
     timerRef.current = setInterval(() => {
       setElapsed((Date.now() - slideStartRef.current) / 1000);
-    }, 200);
+    }, 100);
     return () => clearInterval(timerRef.current);
   }, [isPlaying, currentIndex, slide]);
 
   /* ─── Narration subtitle sync ─── */
   useEffect(() => {
-    if (!slide?.narration?.length || !showSubtitles) {
-      setSubtitle('');
-      return;
-    }
+    if (!slide?.narration?.length || !showSubtitles) { setSubtitle(''); return; }
     const cues = slide.narration;
     let current = '';
-    for (const cue of cues) {
-      if (elapsed >= cue.t) current = cue.text;
-    }
+    for (const cue of cues) { if (elapsed >= cue.t) current = cue.text; }
     setSubtitle(current);
   }, [elapsed, slide, showSubtitles]);
 
@@ -82,40 +97,27 @@ export default function PlayerPage() {
   useEffect(() => {
     if (!isPlaying || !slide) return;
     if (elapsed >= slide.duration) {
-      if (currentIndex < totalSlides - 1) {
-        store.next();
-      } else {
-        store.setIsPlaying(false);
-      }
+      if (currentIndex < totalSlides - 1) store.next();
+      else store.setIsPlaying(false);
     }
   }, [elapsed, isPlaying, slide, currentIndex, totalSlides, store]);
 
   /* ─── Audio / TTS playback ─── */
   const stopAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
   }, []);
 
   useEffect(() => {
     stopAudio();
     if (!slide || !isPlaying) return;
-
-    const slideId = slide.id;
-    const audioUrl = audioMap[slideId];
-
+    const audioUrl = audioMap[slide.id];
     if (audioUrl) {
-      // Pre-generated audio
       const audio = new Audio(audioUrl);
       audio.volume = volume;
       audioRef.current = audio;
       audio.play().catch(() => {});
-    } else if (store.config.ttsProvider === 'browser' && slide.narration?.length) {
-      // Browser TTS fallback
+    } else if (slide.narration?.length) {
       const text = slide.narration.map((n) => n.text).join(' ');
       if (text && typeof window !== 'undefined' && window.speechSynthesis) {
         const utt = new SpeechSynthesisUtterance(text);
@@ -125,46 +127,29 @@ export default function PlayerPage() {
         window.speechSynthesis.speak(utt);
       }
     }
-
     return stopAudio;
   }, [currentIndex, isPlaying, audioMap, slide, volume, stopAudio, store.config.ttsProvider]);
 
-  /* ─── Volume change ─── */
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = volume;
-  }, [volume]);
+  useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, [volume]);
 
-  /* ─── Keyboard navigation ─── */
+  /* ─── Keyboard ─── */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Don't capture keys when typing in QA input
+      if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
       switch (e.key) {
-        case ' ':
-        case 'k':
-          e.preventDefault();
-          store.togglePlay();
-          break;
-        case 'ArrowRight':
-        case 'l':
-          store.next();
-          break;
-        case 'ArrowLeft':
-        case 'j':
-          store.prev();
-          break;
-        case 'f':
-          toggleFullscreen();
-          break;
-        case 's':
-          store.setShowSubtitles(!showSubtitles);
-          break;
-        case 'm':
-          store.setVolume(volume > 0 ? 0 : 0.8);
-          break;
+        case ' ': case 'k': e.preventDefault(); store.togglePlay(); break;
+        case 'ArrowRight': case 'l': store.next(); break;
+        case 'ArrowLeft': case 'j': store.prev(); break;
+        case 'f': toggleFullscreen(); break;
+        case 's': store.setShowSubtitles(!showSubtitles); break;
+        case 'm': store.setVolume(volume > 0 ? 0 : 0.8); break;
+        case 'Escape': if (showThumbnails) setShowThumbnails(false); break;
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [store, showSubtitles, volume]);
+  }, [store, showSubtitles, volume, showThumbnails]);
 
   /* ─── Fullscreen ─── */
   const toggleFullscreen = () => {
@@ -178,204 +163,227 @@ export default function PlayerPage() {
   };
 
   /* ─── Auto-hide controls ─── */
-  const showControlsTemporarily = () => {
+  const showControlsTemporarily = useCallback(() => {
     setShowControls(true);
     if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-    controlsTimerRef.current = setTimeout(() => {
-      if (isPlaying) setShowControls(false);
-    }, 3000);
-  };
-
-  useEffect(() => {
-    if (!isPlaying) setShowControls(true);
+    controlsTimerRef.current = setTimeout(() => { if (isPlaying) setShowControls(false); }, 3000);
   }, [isPlaying]);
+
+  useEffect(() => { if (!isPlaying) setShowControls(true); }, [isPlaying]);
 
   if (!presentation || !slide) return null;
 
-  const transition = slide.transition || 'fade';
-  const variants = transitionVariants[transition] || transitionVariants.fade;
+  const trans = slide.transition || 'fade';
+  const v = variants[trans] || variants.fade;
   const progress = slide.duration > 0 ? Math.min(elapsed / slide.duration, 1) : 0;
+  const globalProgress = ((currentIndex + progress) / totalSlides) * 100;
 
   return (
     <div
-      className="relative w-full h-screen bg-[#020617] overflow-hidden select-none"
+      className="player-shell"
       onMouseMove={showControlsTemporarily}
-      onClick={showControlsTemporarily}
     >
-      {/* ─── Slide frame ─── */}
-      <div className="absolute inset-0 flex items-center justify-center pb-16 pt-12">
-        <div
-          className="relative w-full h-full max-w-[177.78vh] max-h-[56.25vw] overflow-hidden"
-          style={{ aspectRatio: '16/9' }}
-        >
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={slide.id}
-              {...variants}
-              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0"
-              style={{ background: slide.background }}
-            >
-              <SlideRenderer slide={slide} />
-            </motion.div>
-          </AnimatePresence>
+      {/* ═══ Ambient glow behind the slide ═══ */}
+      <div className="player-ambient" />
+
+      {/* ═══ Slide viewport ═══ */}
+      <div className="absolute inset-0 flex items-center justify-center z-[1]">
+        <div className="player-viewport">
+          {/* Subtle rounded bezel */}
+          <div className="player-bezel">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={slide.id}
+                {...v}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-0"
+                style={{ background: slide.background }}
+              >
+                <SlideRenderer slide={slide} />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Edge navigation zones (click left/right thirds) */}
+          <div className="absolute inset-y-0 left-0 w-1/4 z-10 cursor-pointer group"
+            onClick={() => store.prev()}>
+            <div className="absolute inset-y-0 left-2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <div className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
+                <ChevronLeft className="w-5 h-5 text-white/80" />
+              </div>
+            </div>
+          </div>
+          <div className="absolute inset-y-0 right-0 w-1/4 z-10 cursor-pointer group"
+            onClick={() => store.next()}>
+            <div className="absolute inset-y-0 right-2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <div className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
+                <ChevronRight className="w-5 h-5 text-white/80" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ─── Subtitle overlay ─── */}
+      {/* ═══ Subtitle overlay ═══ */}
       <AnimatePresence>
         {showSubtitles && subtitle && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30 max-w-3xl"
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.2 }}
+            className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 max-w-2xl px-4"
           >
-            <div className="px-6 py-3 rounded-xl bg-black/70 backdrop-blur-sm text-white text-sm sm:text-base text-center leading-relaxed">
-              {subtitle}
-            </div>
+            <p className="player-subtitle">{subtitle}</p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ─── Top bar ─── */}
+      {/* ═══ Top bar ═══ */}
       <motion.div
         initial={false}
-        animate={{ opacity: showControls ? 1 : 0, y: showControls ? 0 : -20 }}
-        transition={{ duration: 0.3 }}
-        className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-5 py-3 bg-gradient-to-b from-black/50 to-transparent pointer-events-auto"
+        animate={{ opacity: showControls ? 1 : 0, y: showControls ? 0 : -12 }}
+        transition={{ duration: 0.25 }}
+        className="absolute top-0 inset-x-0 z-20 pointer-events-none"
       >
-        <button
-          onClick={() => { stopAudio(); router.push('/create'); }}
-          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/[0.06]"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Exit
-        </button>
-        <div className="flex items-center gap-2.5 px-4 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-          <Layers className="w-3.5 h-3.5 text-indigo-400" />
-          <span className="text-xs text-white/60 font-medium truncate max-w-[280px]">
-            {presentation.metadata.title}
-          </span>
+        <div className="player-topbar pointer-events-auto">
+          <button
+            onClick={() => { stopAudio(); router.push('/create'); }}
+            className="player-btn-ghost"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Exit</span>
+          </button>
+
+          <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/[0.06]">
+            <span className="text-[13px] text-white/70 font-medium truncate max-w-[300px]">
+              {presentation.metadata.title}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-white/40 font-mono tabular-nums">
+              {currentIndex + 1}/{totalSlides}
+            </span>
+          </div>
         </div>
-        <span className="text-xs text-white/40 font-mono tabular-nums px-3 py-1.5 rounded-lg bg-white/[0.04]">
-          {currentIndex + 1} / {totalSlides}
-        </span>
       </motion.div>
 
-      {/* ─── AI Q&A popup ─── */}
+      {/* ═══ AI Q&A ═══ */}
       {slide && presentation && (
-        <SlideQA
-          slide={slide}
-          presentationTitle={presentation.metadata.title}
-          language={presentation.metadata.language || 'English'}
-        />
+        <SlideQA slide={slide} presentationTitle={presentation.metadata.title}
+          language={presentation.metadata.language || 'English'} />
       )}
 
-      {/* ─── Bottom controls ─── */}
+      {/* ═══ Bottom control bar ═══ */}
       <motion.div
         initial={false}
-        animate={{ opacity: showControls ? 1 : 0, y: showControls ? 0 : 20 }}
-        transition={{ duration: 0.3 }}
-        className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/60 to-transparent pointer-events-auto"
+        animate={{ opacity: showControls ? 1 : 0, y: showControls ? 0 : 16 }}
+        transition={{ duration: 0.25 }}
+        className="absolute bottom-0 inset-x-0 z-20 pointer-events-none"
       >
-        {/* Slide progress bar */}
-        <div className="px-5 mb-1">
-          <div
-            className="h-1 rounded-full bg-white/10 cursor-pointer group"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-              slideStartRef.current = Date.now() - pct * (slide.duration * 1000);
-              setElapsed(pct * slide.duration);
-            }}
-          >
+        <div className="player-controls pointer-events-auto">
+          {/* Global progress (thin line at very bottom) */}
+          <div className="absolute bottom-0 inset-x-0 h-[3px] bg-white/[0.06]">
+            <div className="h-full bg-indigo-500/50 transition-all duration-200"
+              style={{ width: `${globalProgress}%` }} />
+          </div>
+
+          {/* Slide progress bar */}
+          <div className="px-4 pt-3 pb-1">
             <div
-              className="h-full rounded-full bg-indigo-500 relative transition-all group-hover:h-1.5"
-              style={{ width: `${progress * 100}%` }}
+              className="player-progress-track group"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                slideStartRef.current = Date.now() - pct * (slide.duration * 1000);
+                setElapsed(pct * slide.duration);
+              }}
             >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="player-progress-fill" style={{ width: `${progress * 100}%` }}>
+                <div className="player-progress-thumb" />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Controls row */}
-        <div className="flex items-center gap-3 px-5 py-3">
-          {/* Prev */}
-          <button
-            onClick={() => store.prev()}
-            disabled={currentIndex === 0}
-            className="text-white/60 hover:text-white disabled:text-white/20 transition-colors"
-          >
-            <SkipBack className="w-5 h-5" />
-          </button>
-
-          {/* Play/Pause */}
-          <button
-            onClick={() => store.togglePlay()}
-            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center text-white transition-colors"
-          >
-            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-          </button>
-
-          {/* Next */}
-          <button
-            onClick={() => store.next()}
-            disabled={currentIndex >= totalSlides - 1}
-            className="text-white/60 hover:text-white disabled:text-white/20 transition-colors"
-          >
-            <SkipForward className="w-5 h-5" />
-          </button>
-
-          {/* Time */}
-          <span className="text-xs text-white/40 font-mono tabular-nums ml-2">
-            {Math.floor(elapsed)}s / {slide.duration}s
-          </span>
-
-          <div className="flex-1" />
-
-          {/* Volume */}
-          <div className="flex items-center gap-2 group">
-            <button
-              onClick={() => store.setVolume(volume > 0 ? 0 : 0.8)}
-              className="text-white/50 hover:text-white transition-colors"
-            >
-              {volume > 0 ? <Volume2 className="w-4.5 h-4.5" /> : <VolumeX className="w-4.5 h-4.5" />}
+          {/* Control buttons row */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-4 pb-3 pt-1">
+            {/* Play / Pause */}
+            <button onClick={() => store.togglePlay()} className="player-btn-play">
+              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
             </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={volume}
-              onChange={(e) => store.setVolume(Number(e.target.value))}
-              className="w-20 accent-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"
-            />
+
+            {/* Prev / Next */}
+            <button
+              onClick={() => store.prev()}
+              disabled={currentIndex === 0}
+              className="player-btn-icon"
+            >
+              <SkipBack className="w-[18px] h-[18px]" />
+            </button>
+            <button
+              onClick={() => store.next()}
+              disabled={currentIndex >= totalSlides - 1}
+              className="player-btn-icon"
+            >
+              <SkipForward className="w-[18px] h-[18px]" />
+            </button>
+
+            {/* Time */}
+            <span className="text-[11px] sm:text-xs text-white/40 font-mono tabular-nums ml-1 select-none">
+              {fmt(elapsed)} / {fmt(slide.duration)}
+            </span>
+
+            <div className="flex-1" />
+
+            {/* Volume group */}
+            <div className="hidden sm:flex items-center gap-1.5 group/vol">
+              <button onClick={() => store.setVolume(volume > 0 ? 0 : 0.8)} className="player-btn-icon">
+                {volume > 0 ? <Volume2 className="w-[18px] h-[18px]" /> : <VolumeX className="w-[18px] h-[18px]" />}
+              </button>
+              <input
+                type="range" min={0} max={1} step={0.05} value={volume}
+                onChange={(e) => store.setVolume(Number(e.target.value))}
+                className="player-volume-slider"
+              />
+            </div>
+
+            {/* Subtitles */}
+            <button
+              onClick={() => store.setShowSubtitles(!showSubtitles)}
+              className={`player-btn-icon ${showSubtitles ? '!text-indigo-400' : ''}`}
+            >
+              <Subtitles className="w-[18px] h-[18px]" />
+            </button>
+
+            {/* Fullscreen */}
+            <button onClick={toggleFullscreen} className="player-btn-icon">
+              {isFullscreen ? <Minimize className="w-[18px] h-[18px]" /> : <Maximize className="w-[18px] h-[18px]" />}
+            </button>
           </div>
-
-          {/* Subtitles */}
-          <button
-            onClick={() => store.setShowSubtitles(!showSubtitles)}
-            className={`transition-colors ${showSubtitles ? 'text-indigo-400' : 'text-white/30 hover:text-white/60'}`}
-          >
-            <Subtitles className="w-4.5 h-4.5" />
-          </button>
-
-          {/* Fullscreen */}
-          <button
-            onClick={toggleFullscreen}
-            className="text-white/50 hover:text-white transition-colors"
-          >
-            {isFullscreen ? <Minimize className="w-4.5 h-4.5" /> : <Maximize className="w-4.5 h-4.5" />}
-          </button>
         </div>
+      </motion.div>
 
-        {/* Global progress (all slides) */}
-        <div className="h-0.5 bg-white/[0.04]">
-          <div
-            className="h-full bg-indigo-500/40 transition-all duration-300"
-            style={{ width: `${((currentIndex + progress) / totalSlides) * 100}%` }}
-          />
+      {/* ═══ Slide dots (mini-map above controls) ═══ */}
+      <motion.div
+        initial={false}
+        animate={{ opacity: showControls ? 1 : 0 }}
+        className="absolute bottom-[72px] left-1/2 -translate-x-1/2 z-20 pointer-events-auto"
+      >
+        <div className="flex items-center gap-1">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => store.setCurrentIndex(i)}
+              className={`transition-all duration-200 rounded-full ${
+                i === currentIndex
+                  ? 'w-6 h-1.5 bg-indigo-400'
+                  : i < currentIndex
+                    ? 'w-1.5 h-1.5 bg-white/30 hover:bg-white/50'
+                    : 'w-1.5 h-1.5 bg-white/15 hover:bg-white/30'
+              }`}
+            />
+          ))}
         </div>
       </motion.div>
     </div>
