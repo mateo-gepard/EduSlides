@@ -53,6 +53,8 @@ export default function PlayerPage() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const delayedStartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playTokenRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const slideStartRef = useRef<number>(Date.now());
   const currentIndexRef = useRef(currentIndex);
@@ -82,21 +84,42 @@ export default function PlayerPage() {
 
   /* ─── Lock body scroll ─── */
   useEffect(() => {
+    const scrollY = window.scrollY;
     const prevBodyOverflow = document.body.style.overflow;
     const prevBodyPosition = document.body.style.position;
+    const prevBodyTop = document.body.style.top;
+    const prevBodyLeft = document.body.style.left;
+    const prevBodyRight = document.body.style.right;
     const prevBodyWidth = document.body.style.width;
     const prevHtmlOverflow = document.documentElement.style.overflow;
 
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
     document.body.style.width = '100%';
     document.documentElement.style.overflow = 'hidden';
 
+    const preventScroll = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      const allowInteraction = Boolean(target?.closest('input[type="range"], textarea, input'));
+      if (!allowInteraction) e.preventDefault();
+    };
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    document.addEventListener('wheel', preventScroll, { passive: false });
+
     return () => {
+      document.removeEventListener('touchmove', preventScroll as EventListener);
+      document.removeEventListener('wheel', preventScroll as EventListener);
       document.body.style.overflow = prevBodyOverflow;
       document.body.style.position = prevBodyPosition;
+      document.body.style.top = prevBodyTop;
+      document.body.style.left = prevBodyLeft;
+      document.body.style.right = prevBodyRight;
       document.body.style.width = prevBodyWidth;
       document.documentElement.style.overflow = prevHtmlOverflow;
+      window.scrollTo(0, scrollY);
     };
   }, []);
 
@@ -137,6 +160,11 @@ export default function PlayerPage() {
 
   /* ─── Audio / TTS playback ─── */
   const stopAudio = useCallback(() => {
+    if (delayedStartRef.current) {
+      clearTimeout(delayedStartRef.current);
+      delayedStartRef.current = null;
+    }
+    playTokenRef.current += 1;
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
   }, []);
@@ -144,7 +172,19 @@ export default function PlayerPage() {
   useEffect(() => {
     stopAudio();
     if (!slide || !isPlaying) return;
-    let startTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const targetIndex = currentIndex;
+    const scheduleDelayedPlay = (audio: HTMLAudioElement) => {
+      const token = ++playTokenRef.current;
+      if (delayedStartRef.current) clearTimeout(delayedStartRef.current);
+      delayedStartRef.current = setTimeout(() => {
+        // Guard against stale delayed starts after slide skip.
+        if (token !== playTokenRef.current) return;
+        if (currentIndexRef.current !== targetIndex) return;
+        if (!isPlayingRef.current) return;
+        audio.play().catch(() => {});
+      }, 2000);
+    };
 
     const playBrowserTts = () => {
       if (!slide.narration?.length) return;
@@ -168,9 +208,7 @@ export default function PlayerPage() {
         const minDur = Math.ceil(audio.duration + 4); // 2s lead-in + 2s tail buffer
         if (Number.isFinite(minDur) && minDur > 0) setAudioMinDuration(minDur);
       };
-      startTimer = setTimeout(() => {
-        audio.play().catch(() => {});
-      }, 2000);
+      scheduleDelayedPlay(audio);
     } else if (config.ttsProvider !== 'browser' && slide.narration?.length) {
       if (!ttsGeneratingRef.current.has(slide.id)) {
         ttsGeneratingRef.current.add(slide.id);
@@ -197,9 +235,7 @@ export default function PlayerPage() {
                 const minDur = Math.ceil(audio.duration + 4); // 2s lead-in + 2s tail buffer
                 if (Number.isFinite(minDur) && minDur > 0) setAudioMinDuration(minDur);
               };
-              setTimeout(() => {
-                audio.play().catch(() => {});
-              }, 2000);
+              scheduleDelayedPlay(audio);
             }
           })
           .catch(() => {
@@ -213,7 +249,6 @@ export default function PlayerPage() {
       playBrowserTts();
     }
     return () => {
-      if (startTimer) clearTimeout(startTimer);
       stopAudio();
     };
   }, [currentIndex, isPlaying, audioMap, slide, volume, stopAudio, config.ttsProvider, setAudio]);
