@@ -271,7 +271,7 @@ export default function CreatePage() {
           }
         }
 
-        const imgSlides = pendingPresentation.slides.filter((s) => s.imageQuery);
+        const imgSlides = pendingPresentation.slides.filter((s) => s.imageQuery && !s.imageUrl);
         if (imgSlides.length > 0) {
           store.setPhase('designing', 'Loading reference images...');
           await Promise.allSettled(

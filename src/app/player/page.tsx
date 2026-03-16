@@ -55,10 +55,12 @@ export default function PlayerPage() {
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
   const delayedStartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playTokenRef = useRef(0);
+  const prefetchRunRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const slideStartRef = useRef<number>(Date.now());
   const currentIndexRef = useRef(currentIndex);
   const isPlayingRef = useRef(isPlaying);
+  const audioMapRef = useRef(audioMap);
 
   const [elapsed, setElapsed] = useState(0);
   const [subtitle, setSubtitle] = useState('');
@@ -81,6 +83,10 @@ export default function PlayerPage() {
     currentIndexRef.current = currentIndex;
     isPlayingRef.current = isPlaying;
   }, [currentIndex, isPlaying]);
+
+  useEffect(() => {
+    audioMapRef.current = audioMap;
+  }, [audioMap]);
 
   /* ─── Lock body scroll ─── */
   useEffect(() => {
@@ -169,6 +175,72 @@ export default function PlayerPage() {
     if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
   }, []);
 
+  const ensureProviderAudio = useCallback(async (targetSlide?: (typeof slides)[number]) => {
+    if (!targetSlide?.id || !targetSlide.narration?.length) return null;
+    if (config.ttsProvider === 'browser') return null;
+    const cached = audioMapRef.current[targetSlide.id];
+    if (cached) return cached;
+    if (ttsGeneratingRef.current.has(targetSlide.id)) return null;
+
+    ttsGeneratingRef.current.add(targetSlide.id);
+    try {
+      const text = targetSlide.narration.map((n) => n.text).join(' ');
+      if (!text.trim()) return null;
+      const ttsRes = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, provider: config.ttsProvider }),
+      });
+      if (!ttsRes.ok) throw new Error('TTS generation failed');
+      const blob = await ttsRes.blob();
+      const generatedUrl = URL.createObjectURL(blob);
+      setAudio(targetSlide.id, generatedUrl);
+      return generatedUrl;
+    } catch {
+      return null;
+    } finally {
+      ttsGeneratingRef.current.delete(targetSlide.id);
+    }
+  }, [config.ttsProvider, setAudio]);
+
+  // Prewarm provider TTS for current and next slide to keep starts close to 2s lead-in.
+  useEffect(() => {
+    if (!slides.length) return;
+    if (config.ttsProvider === 'browser') return;
+
+    const current = slides[currentIndex];
+    const nextSlide = slides[currentIndex + 1];
+    void ensureProviderAudio(current);
+    void ensureProviderAudio(nextSlide);
+  }, [slides, currentIndex, config.ttsProvider, ensureProviderAudio]);
+
+  // Keep generating provider audio in background to avoid random per-slide delays.
+  useEffect(() => {
+    if (!slides.length) return;
+    if (config.ttsProvider === 'browser') return;
+
+    const runId = ++prefetchRunRef.current;
+    const queue = slides
+      .slice(currentIndex)
+      .filter((s) => s.narration?.length && !audioMapRef.current[s.id]);
+
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < queue.length) {
+        if (prefetchRunRef.current !== runId) return;
+        const idx = cursor;
+        cursor += 1;
+        await ensureProviderAudio(queue[idx]);
+      }
+    };
+
+    void Promise.all([worker(), worker()]);
+
+    return () => {
+      if (prefetchRunRef.current === runId) prefetchRunRef.current += 1;
+    };
+  }, [slides, currentIndex, config.ttsProvider, ensureProviderAudio]);
+
   useEffect(() => {
     stopAudio();
     if (!slide || !isPlaying) return;
@@ -235,49 +307,35 @@ export default function PlayerPage() {
       };
       scheduleDelayedPlay(audio);
     } else if (config.ttsProvider !== 'browser' && slide.narration?.length) {
-      if (!ttsGeneratingRef.current.has(slide.id)) {
-        ttsGeneratingRef.current.add(slide.id);
-        const text = slide.narration.map((n) => n.text).join(' ');
-        fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, provider: config.ttsProvider }),
-        })
-          .then(async (res) => {
-            if (!res.ok) throw new Error('TTS generation failed');
-            const blob = await res.blob();
-            const generatedUrl = URL.createObjectURL(blob);
-            setAudio(slide.id, generatedUrl);
-
-            // If user is still on this slide and playing, start generated audio immediately.
-            if (currentIndexRef.current === currentIndex && isPlayingRef.current) {
-              stopAudio();
-              const audio = new Audio(generatedUrl);
-              audio.volume = volume;
-              audioRef.current = audio;
-              audio.preload = 'auto';
-              audio.load();
-              audio.onloadedmetadata = () => {
-                const minDur = Math.ceil(audio.duration + 4); // 2s lead-in + 2s tail buffer
-                if (Number.isFinite(minDur) && minDur > 0) setAudioMinDuration(minDur);
-              };
-              scheduleDelayedPlay(audio);
-            }
-          })
-          .catch(() => {
+      void ensureProviderAudio(slide)
+        .then((generatedUrl) => {
+          if (!generatedUrl) {
             playBrowserTts();
-          })
-          .finally(() => {
-            ttsGeneratingRef.current.delete(slide.id);
-          });
-      }
+            return;
+          }
+
+          // If user is still on this slide and playing, start generated audio immediately.
+          if (currentIndexRef.current === currentIndex && isPlayingRef.current) {
+            stopAudio();
+            const audio = new Audio(generatedUrl);
+            audio.volume = volume;
+            audioRef.current = audio;
+            audio.preload = 'auto';
+            audio.load();
+            audio.onloadedmetadata = () => {
+              const minDur = Math.ceil(audio.duration + 4); // 2s lead-in + 2s tail buffer
+              if (Number.isFinite(minDur) && minDur > 0) setAudioMinDuration(minDur);
+            };
+            scheduleDelayedPlay(audio);
+          }
+        });
     } else if (slide.narration?.length) {
       playBrowserTts();
     }
     return () => {
       stopAudio();
     };
-  }, [currentIndex, isPlaying, audioMap, slide, volume, stopAudio, config.ttsProvider, setAudio]);
+  }, [currentIndex, isPlaying, audioMap, slide, volume, stopAudio, config.ttsProvider, ensureProviderAudio]);
 
   useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, [volume]);
 

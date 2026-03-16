@@ -49,6 +49,7 @@ export default function LibraryPage() {
   const [presentations, setPresentations] = useState<SavedPresentation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [preparingId, setPreparingId] = useState<string | null>(null);
 
   const loadPresentations = useCallback(async () => {
     setLoading(true);
@@ -67,7 +68,9 @@ export default function LibraryPage() {
     loadPresentations();
   }, [loadPresentations]);
 
-  const handlePlay = (saved: SavedPresentation) => {
+  const handlePlay = async (saved: SavedPresentation) => {
+    if (preparingId) return;
+
     const legacyTtsProvider = saved.cost?.costs.find((c) => c.phase === 'tts')?.provider;
     const scriptProvider =
       saved.config.scriptProvider === 'gemini' ||
@@ -86,24 +89,60 @@ export default function LibraryPage() {
         ? saved.config.ttsProvider
         : (legacyTtsProvider === 'openai' || legacyTtsProvider === 'elevenlabs' ? legacyTtsProvider : 'browser');
 
-    store.setConfig({
-      topic: saved.config.topic,
-      subject: saved.config.subject,
-      depth: saved.config.depth,
-      duration: saved.config.duration,
-      language: saved.config.language,
-      scriptProvider,
-      designProvider,
-      ttsProvider,
-    });
-    store.setPresentation(saved.presentation);
-    if (saved.cost) {
-      store.setGenerationCost({
-        totalCost: saved.cost.totalCost,
-        costs: saved.cost.costs.map(c => ({ ...c, inputCost: 0, outputCost: 0 })),
+    setPreparingId(saved.id);
+    try {
+      store.setConfig({
+        topic: saved.config.topic,
+        subject: saved.config.subject,
+        depth: saved.config.depth,
+        duration: saved.config.duration,
+        language: saved.config.language,
+        scriptProvider,
+        designProvider,
+        ttsProvider,
       });
+      store.setPresentation(saved.presentation);
+      if (saved.cost) {
+        store.setGenerationCost({
+          totalCost: saved.cost.totalCost,
+          costs: saved.cost.costs.map(c => ({ ...c, inputCost: 0, outputCost: 0 })),
+        });
+      }
+
+      // Pre-generate first slides audio for library decks to avoid long initial silence.
+      if (ttsProvider !== 'browser') {
+        const candidates = (saved.presentation.slides || [])
+          .filter((s) => s.narration?.length)
+          .slice(0, 2);
+
+        await Promise.allSettled(
+          candidates.map(async (s) => {
+            const text = s.narration!.map((n) => n.text).join(' ');
+            if (!text.trim()) return;
+
+            const res = await Promise.race([
+              fetch('/api/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, provider: ttsProvider }),
+              }),
+              new Promise<Response>((_, reject) => {
+                setTimeout(() => reject(new Error('TTS prefetch timeout')), 9000);
+              }),
+            ]);
+
+            if (!res.ok) return;
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            store.setAudio(s.id, url);
+          }),
+        );
+      }
+
+      router.push('/player');
+    } finally {
+      setPreparingId(null);
     }
-    router.push('/player');
   };
 
   return (
@@ -228,12 +267,17 @@ export default function LibraryPage() {
                   >
                     <button
                       onClick={() => handlePlay(saved)}
+                      disabled={preparingId === saved.id}
                       className="card group !p-0 overflow-hidden w-full text-left hover:!border-indigo-500/30 cursor-pointer"
                     >
                       {/* Preview header */}
                       <div className="relative px-6 pt-6 pb-5 bg-gradient-to-br from-[#0c1029] to-[#0f1535]">
                         <div className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Play className="w-4 h-4 text-white ml-0.5" />
+                          {preparingId === saved.id ? (
+                            <Loader2 className="w-4 h-4 text-white animate-spin" />
+                          ) : (
+                            <Play className="w-4 h-4 text-white ml-0.5" />
+                          )}
                         </div>
                         <h3 className="text-base font-semibold text-white mb-1 pr-8 line-clamp-2 group-hover:text-indigo-200 transition-colors">
                           {presentation.metadata?.title || config.topic || 'Untitled'}

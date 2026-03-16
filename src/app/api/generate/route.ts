@@ -135,6 +135,65 @@ function repairJson(raw: string): string {
   return json;
 }
 
+function isLikelyPhotoUrl(url: string): boolean {
+  if (!/^https?:\/\//i.test(url)) return false;
+  if (/\.(gif|svg|bmp|ico)(\?|$)/i.test(url)) return false;
+  return true;
+}
+
+function normalizeSlideHeading(slide: Record<string, unknown>): string {
+  const content = slide.content as Record<string, unknown> | undefined;
+  const keys = ['heading', 'title', 'statement', 'question', 'fact'] as const;
+  for (const key of keys) {
+    const v = content?.[key];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  if (typeof slide.type === 'string') return slide.type;
+  return 'slide';
+}
+
+function deriveImageQuery(
+  topic: string,
+  subject: string | undefined,
+  slide: Record<string, unknown>,
+): string {
+  const heading = normalizeSlideHeading(slide);
+  const subjectPart = subject?.trim() ? `${subject.trim()} ` : '';
+  const typePart = typeof slide.type === 'string' ? slide.type : 'slide';
+  return `${subjectPart}${topic} ${heading} ${typePart} historical photograph`;
+}
+
+async function fetchBingImageCandidates(query: string): Promise<string[]> {
+  if (!query.trim()) return [];
+  try {
+    const searchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&first=1&qft=+filterui:photo-photo+filterui:imagesize-large`;
+    const res = await fetch(searchUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return [];
+
+    const html = await res.text();
+    const urls: string[] = [];
+    for (const m of html.matchAll(/"murl"\s*:\s*"(https?:\/\/[^\"]+)"/g)) {
+      urls.push(m[1]);
+    }
+    for (const m of html.matchAll(/murl&quot;:&quot;(https?:\/\/[^&\"]+)/g)) {
+      urls.push(m[1]);
+    }
+
+    const unique = Array.from(new Set(urls.filter((u) => isLikelyPhotoUrl(u))));
+    return unique.slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+
 export async function POST(req: Request) {
   const body = await req.json();
   const {
@@ -202,6 +261,154 @@ export async function POST(req: Request) {
           level,
           ts: new Date().toISOString(),
         });
+      }
+
+      async function collectText(params: Parameters<typeof streamText>[0]): Promise<string> {
+        const streamed = streamText(params);
+        let text = '';
+        for await (const delta of streamed.textStream) {
+          text += delta;
+        }
+        return text;
+      }
+
+      async function enrichPresentationImages(presentation: Record<string, unknown>) {
+        const slidesRaw = presentation.slides;
+        if (!Array.isArray(slidesRaw) || slidesRaw.length === 0) return;
+
+        type SlideWithImage = {
+          id: string;
+          type: string;
+          imageQuery?: string;
+          imageUrl?: string;
+          content?: Record<string, unknown>;
+        };
+
+        const slides = slidesRaw as SlideWithImage[];
+
+        for (const s of slides) {
+          if (!s.imageQuery && s.content?.type === 'image-spotlight' && typeof s.content.imageQuery === 'string') {
+            s.imageQuery = s.content.imageQuery;
+          }
+        }
+
+        const isHistoryLike = /history|histor|krieg|war|weimar|mittelalter|renaissance|empire|revolution|world war/i.test(
+          `${topic} ${subject || ''}`,
+        );
+
+        const preferredTypes = new Set([
+          'image-spotlight', 'timeline', 'quote', 'funfact', 'title', 'summary', 'comparison',
+        ]);
+
+        const desiredImages = Math.min(
+          slides.length,
+          isHistoryLike
+            ? Math.max(5, Math.ceil(slides.length * 0.5))
+            : Math.max(3, Math.ceil(slides.length * 0.3)),
+        );
+
+        const targetSlides = slides
+          .filter((s) => preferredTypes.has(s.type) || Boolean(s.imageQuery))
+          .slice(0, Math.max(desiredImages + 2, 8));
+
+        for (const s of targetSlides) {
+          if (!s.imageQuery) {
+            s.imageQuery = deriveImageQuery(topic, subject, s as unknown as Record<string, unknown>);
+          }
+        }
+
+        const candidatesById: Record<string, { query: string; candidates: string[] }> = {};
+        await Promise.all(
+          targetSlides.map(async (s) => {
+            const query = (s.imageQuery || '').trim();
+            if (!query) return;
+            const candidates = await fetchBingImageCandidates(query);
+            candidatesById[s.id] = { query, candidates };
+          }),
+        );
+
+        const geminiKey = resolveKey('gemini');
+        if (geminiKey) {
+          try {
+            const selectionPrompt = {
+              topic,
+              subject,
+              language,
+              desiredImages,
+              slides: targetSlides.map((s) => ({
+                id: s.id,
+                type: s.type,
+                heading: normalizeSlideHeading(s as unknown as Record<string, unknown>),
+                query: candidatesById[s.id]?.query || s.imageQuery || '',
+                candidates: candidatesById[s.id]?.candidates || [],
+              })),
+            };
+
+            const geminiText = await collectText({
+              model: createModel('gemini', geminiKey),
+              system: `You assign best image URLs for slides.\nRules:\n- Return JSON only: {"images":[{"id":"slide-id","imageUrl":"https://...","imageQuery":"..."}]}\n- Use only provided candidate URLs when available.\n- Prefer distinct URLs across slides; avoid repeating same URL.\n- Prioritize historical photographs for history topics.\n- Keep at least ${Math.max(3, Math.floor(desiredImages * 0.7))} distinct slide-image assignments.`,
+              prompt: JSON.stringify(selectionPrompt),
+              maxOutputTokens: 3000,
+              temperature: 0.2,
+            });
+
+            const parsed = JSON.parse(repairJson(geminiText)) as {
+              images?: Array<{ id?: string; imageUrl?: string; imageQuery?: string }>;
+            };
+            const selected = Array.isArray(parsed.images) ? parsed.images : [];
+            const usedUrls = new Set<string>();
+
+            for (const img of selected) {
+              if (!img.id || !img.imageUrl || !isLikelyPhotoUrl(img.imageUrl)) continue;
+              if (usedUrls.has(img.imageUrl)) continue;
+              const slide = slides.find((s) => s.id === img.id);
+              if (!slide) continue;
+
+              slide.imageUrl = img.imageUrl;
+              if (typeof img.imageQuery === 'string' && img.imageQuery.trim()) {
+                slide.imageQuery = img.imageQuery.trim();
+              }
+              usedUrls.add(img.imageUrl);
+            }
+
+            for (const s of targetSlides) {
+              if (s.imageUrl) continue;
+              const fallback = (candidatesById[s.id]?.candidates || []).find((u) => !usedUrls.has(u));
+              if (!fallback) continue;
+              s.imageUrl = fallback;
+              usedUrls.add(fallback);
+            }
+
+            sendDebug('Gemini image linker complete', {
+              targetSlides: targetSlides.length,
+              desiredImages,
+              linkedSlides: slides.filter((s) => Boolean(s.imageUrl)).length,
+            });
+            return;
+          } catch (err) {
+            sendDebug('Gemini image linker failed; using fallback candidates', {
+              error: err instanceof Error ? err.message : String(err),
+            }, 'warn');
+          }
+        }
+
+        // Fallback: assign first non-duplicate candidate per target.
+        const usedUrls = new Set<string>();
+        for (const s of targetSlides) {
+          if (s.imageUrl) {
+            usedUrls.add(s.imageUrl);
+            continue;
+          }
+          const fallback = (candidatesById[s.id]?.candidates || []).find((u) => !usedUrls.has(u));
+          if (!fallback) continue;
+          s.imageUrl = fallback;
+          usedUrls.add(fallback);
+        }
+
+        sendDebug('Fallback image linker complete', {
+          targetSlides: targetSlides.length,
+          linkedSlides: slides.filter((s) => Boolean(s.imageUrl)).length,
+        }, 'warn');
       }
 
       async function runWithTimeoutAndHeartbeat<T>(
@@ -720,6 +927,11 @@ export async function POST(req: Request) {
           totalSlides: presentation.slides.length,
           estimatedDuration: presentation.metadata?.estimatedDuration,
         });
+
+        sendDebug('Running image-link enrichment', {
+          totalSlides: presentation.slides.length,
+        });
+        await enrichPresentationImages(presentation as Record<string, unknown>);
 
         const totalCost = costs.reduce((acc, c) => acc + c.total, 0);
         sendDebug('Generation pipeline complete', {
