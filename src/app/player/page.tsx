@@ -177,13 +177,37 @@ export default function PlayerPage() {
     const scheduleDelayedPlay = (audio: HTMLAudioElement) => {
       const token = ++playTokenRef.current;
       if (delayedStartRef.current) clearTimeout(delayedStartRef.current);
+
+      // Keep a strict 2s lead-in relative to slide start, not relative to when audio becomes available.
+      const leadInMs = 2000;
+      const elapsedSinceSlideStartMs = Date.now() - slideStartRef.current;
+      const delayMs = Math.max(0, leadInMs - elapsedSinceSlideStartMs);
+
       delayedStartRef.current = setTimeout(() => {
         // Guard against stale delayed starts after slide skip.
         if (token !== playTokenRef.current) return;
         if (currentIndexRef.current !== targetIndex) return;
         if (!isPlayingRef.current) return;
-        audio.play().catch(() => {});
-      }, 2000);
+
+        const guardedPlay = () => {
+          if (token !== playTokenRef.current) return;
+          if (currentIndexRef.current !== targetIndex) return;
+          if (!isPlayingRef.current) return;
+          audio.play().catch(() => {
+            // If data is not ready yet, retry once when the audio can play.
+            const onCanPlay = () => {
+              audio.removeEventListener('canplay', onCanPlay);
+              if (token !== playTokenRef.current) return;
+              if (currentIndexRef.current !== targetIndex) return;
+              if (!isPlayingRef.current) return;
+              audio.play().catch(() => {});
+            };
+            audio.addEventListener('canplay', onCanPlay, { once: true });
+          });
+        };
+
+        guardedPlay();
+      }, delayMs);
     };
 
     const playBrowserTts = () => {
@@ -203,7 +227,8 @@ export default function PlayerPage() {
       const audio = new Audio(audioUrl);
       audio.volume = volume;
       audioRef.current = audio;
-      audio.preload = 'metadata';
+      audio.preload = 'auto';
+      audio.load();
       audio.onloadedmetadata = () => {
         const minDur = Math.ceil(audio.duration + 4); // 2s lead-in + 2s tail buffer
         if (Number.isFinite(minDur) && minDur > 0) setAudioMinDuration(minDur);
@@ -230,7 +255,8 @@ export default function PlayerPage() {
               const audio = new Audio(generatedUrl);
               audio.volume = volume;
               audioRef.current = audio;
-              audio.preload = 'metadata';
+              audio.preload = 'auto';
+              audio.load();
               audio.onloadedmetadata = () => {
                 const minDur = Math.ceil(audio.duration + 4); // 2s lead-in + 2s tail buffer
                 if (Number.isFinite(minDur) && minDur > 0) setAudioMinDuration(minDur);
