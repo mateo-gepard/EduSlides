@@ -25,6 +25,14 @@ import { usePresentationStore } from '@/stores/presentation-store';
 import { savePresentation } from '@/lib/firestore';
 import type { Presentation, GenerationPhase } from '@/lib/types';
 
+type DebugEntry = {
+  id: number;
+  ts: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  meta?: unknown;
+};
+
 /* ─── Constants ─── */
 const DEPTHS = [
   'Einführung (basic)',
@@ -83,6 +91,8 @@ export default function CreatePage() {
   const { config, phase, phaseMessage, generationCost } = store;
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showConsole, setShowConsole] = useState(true);
+  const [debugLog, setDebugLog] = useState<DebugEntry[]>([]);
   const [pdfText, setPdfText] = useState('');
   const [pdfName, setPdfName] = useState('');
   const [uploadingPdf, setUploadingPdf] = useState(false);
@@ -115,8 +125,24 @@ export default function CreatePage() {
   const handleGenerate = useCallback(async () => {
     if (!config.topic.trim() && !pdfText) return;
 
+    const pushLog = (entry: Omit<DebugEntry, 'id'>) => {
+      setDebugLog((prev) => {
+        const next = [...prev, { ...entry, id: Date.now() + Math.floor(Math.random() * 1000) }];
+        return next.slice(-120);
+      });
+    };
+
     store.reset();
     store.setPhase('researching', 'Starting generation...');
+    setDebugLog([]);
+    pushLog({ ts: new Date().toISOString(), level: 'info', message: 'Generation started', meta: {
+      scriptProvider: config.scriptProvider,
+      designProvider: config.designProvider,
+      ttsProvider: config.ttsProvider,
+      duration: config.duration,
+      language: config.language,
+      hasPdfContext: Boolean(pdfText),
+    } });
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -170,12 +196,46 @@ export default function CreatePage() {
               switch (currentEvent) {
                 case 'phase':
                   store.setPhase(data.phase as GenerationPhase, data.message);
+                  pushLog({
+                    ts: new Date().toISOString(),
+                    level: 'info',
+                    message: `Phase: ${data.phase}`,
+                    meta: data.message ? { message: data.message } : undefined,
+                  });
                   break;
                 case 'cost':
                   store.setGenerationCost({ costs: data.costs, totalCost: data.totalCost });
+                  pushLog({
+                    ts: new Date().toISOString(),
+                    level: 'info',
+                    message: 'Cost update received',
+                    meta: { totalCost: data.totalCost, phases: data.costs?.length ?? 0 },
+                  });
+                  break;
+                case 'script':
+                  pushLog({
+                    ts: new Date().toISOString(),
+                    level: 'info',
+                    message: 'Script payload received',
+                    meta: { chars: typeof data.script === 'string' ? data.script.length : 0 },
+                  });
+                  break;
+                case 'debug':
+                  pushLog({
+                    ts: typeof data.ts === 'string' ? data.ts : new Date().toISOString(),
+                    level: (data.level as 'info' | 'warn' | 'error') || 'info',
+                    message: data.message || 'Debug event',
+                    meta: data.meta,
+                  });
                   break;
                 case 'result':
                   pendingPresentation = data.presentation as Presentation;
+                  pushLog({
+                    ts: new Date().toISOString(),
+                    level: 'info',
+                    message: 'Presentation result received',
+                    meta: { slides: data.presentation?.slides?.length ?? 0 },
+                  });
                   break;
                 case 'error':
                   throw new Error(data.error);
@@ -301,6 +361,7 @@ export default function CreatePage() {
         }
 
         store.setPhase('complete', 'Presentation ready!');
+        pushLog({ ts: new Date().toISOString(), level: 'info', message: 'Pipeline completed successfully' });
 
         // Save to Firestore (fire-and-forget)
         const costData = store.generationCost ?? undefined;
@@ -322,8 +383,15 @@ export default function CreatePage() {
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
         store.setPhase('idle', '');
+        pushLog({ ts: new Date().toISOString(), level: 'warn', message: 'Generation cancelled by user' });
       } else {
         store.setError((err as Error).message);
+        pushLog({
+          ts: new Date().toISOString(),
+          level: 'error',
+          message: 'Generation failed',
+          meta: { error: (err as Error).message },
+        });
       }
     }
   }, [config, pdfText, store]);
@@ -665,9 +733,14 @@ export default function CreatePage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="glass p-6"
+                  className="glass p-6 space-y-4"
                 >
                   <GenerationProgress phase={phase} message={phaseMessage} onCancel={handleCancel} />
+                  <GenerationConsole
+                    logs={debugLog}
+                    open={showConsole}
+                    onToggle={() => setShowConsole((v) => !v)}
+                  />
                 </motion.div>
               )}
 
@@ -687,6 +760,13 @@ export default function CreatePage() {
                         <p className="text-xs text-slate-400 mt-1">{phaseMessage}</p>
                       </div>
                     </div>
+                  </div>
+                  <div className="glass p-4">
+                    <GenerationConsole
+                      logs={debugLog}
+                      open={showConsole}
+                      onToggle={() => setShowConsole((v) => !v)}
+                    />
                   </div>
                   <button onClick={() => store.setPhase('idle', '')} className="btn btn-secondary w-full">
                     <ArrowLeft className="w-4 h-4" />
@@ -836,6 +916,75 @@ function GenerationProgress({
           style={{ width: '50%' }}
         />
       </div>
+    </div>
+  );
+}
+
+function GenerationConsole({
+  logs,
+  open,
+  onToggle,
+}: {
+  logs: DebugEntry[];
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const levelClass: Record<DebugEntry['level'], string> = {
+    info: 'text-slate-300',
+    warn: 'text-amber-300',
+    error: 'text-rose-300',
+  };
+
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-[#070b18]/70 overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-white/[0.03] transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs font-medium text-slate-200">Generation Console</span>
+          <span className="text-[10px] text-slate-500">{logs.length} events</span>
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="border-t border-white/[0.06]"
+          >
+            <div className="max-h-64 overflow-y-auto p-3 space-y-2 font-mono text-[11px]">
+              {logs.length === 0 && (
+                <p className="text-slate-500">Waiting for model events...</p>
+              )}
+              {logs.map((log) => {
+                const time = new Date(log.ts);
+                const ts = Number.isNaN(time.getTime())
+                  ? '--:--:--'
+                  : time.toLocaleTimeString([], { hour12: false });
+
+                return (
+                  <div key={log.id} className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className={`${levelClass[log.level]} leading-relaxed`}>{log.message}</p>
+                      <span className="text-slate-600 shrink-0">{ts}</span>
+                    </div>
+                    {log.meta !== undefined && (
+                      <pre className="mt-1.5 text-[10px] leading-relaxed text-slate-500 whitespace-pre-wrap break-words">
+                        {JSON.stringify(log.meta, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

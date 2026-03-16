@@ -195,10 +195,27 @@ export async function POST(req: Request) {
           encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
         );
       }
+      function sendDebug(message: string, meta?: Record<string, unknown>, level: 'info' | 'warn' | 'error' = 'info') {
+        sendEvent('debug', {
+          message,
+          meta,
+          level,
+          ts: new Date().toISOString(),
+        });
+      }
 
       try {
         let presentationJson: string;
         const costs: { phase: string; provider: string; inputCost: number; outputCost: number; total: number; inputTokens: number; outputTokens: number }[] = [];
+
+        sendDebug('Generation request accepted', {
+          usePipeline,
+          scriptProvider,
+          designProvider,
+          targetDurationMin: duration,
+          language,
+          hasAdditionalContext: Boolean(additionalContext),
+        });
 
         if (usePipeline) {
           /* ═══════ TWO-PHASE PIPELINE ═══════ */
@@ -207,6 +224,7 @@ export async function POST(req: Request) {
           sendEvent('phase', { phase: 'researching', message: 'Researching topic and writing script...' });
 
           const scriptModel = createModel(scriptProvider, scriptKey);
+          sendDebug('Script model request started', { provider: scriptProvider });
           const scriptResult = await generateText({
             model: scriptModel,
             system: buildScriptSystemPrompt(language),
@@ -222,6 +240,13 @@ export async function POST(req: Request) {
             temperature: 0.7,
           });
 
+          sendDebug('Script model response received', {
+            provider: scriptProvider,
+            inputTokens: scriptResult.usage?.inputTokens ?? 0,
+            outputTokens: scriptResult.usage?.outputTokens ?? 0,
+            textLength: scriptResult.text.length,
+          });
+
           const scriptCost = calcCost(
             scriptProvider,
             scriptResult.usage?.inputTokens ?? 0,
@@ -230,12 +255,20 @@ export async function POST(req: Request) {
           costs.push({ phase: 'script', provider: scriptProvider, ...scriptCost });
 
           const scriptJson = repairJson(scriptResult.text);
+          if (scriptJson !== scriptResult.text) {
+            sendDebug('Script JSON required repair', {
+              originalLength: scriptResult.text.length,
+              repairedLength: scriptJson.length,
+            }, 'warn');
+          }
 
           try {
             JSON.parse(scriptJson);
           } catch {
             throw new Error('Script generation produced invalid JSON. Please retry.');
           }
+
+          sendDebug('Script JSON parsed successfully');
 
           sendEvent('script', { script: scriptJson });
 
@@ -250,12 +283,23 @@ export async function POST(req: Request) {
             ? buildDesignUserPromptCompact(scriptJson, duration)
             : buildDesignUserPrompt(scriptJson, duration);
           const designModel = createModel(designProvider, designKey);
+          sendDebug('Design model request started', {
+            provider: designProvider,
+            maxOutputTokens: designMaxTokens,
+          });
           const designResult = await generateText({
             model: designModel,
             system: designSystemPrompt,
             prompt: designUserPrompt,
             maxOutputTokens: designMaxTokens,
             temperature: 0.4,
+          });
+
+          sendDebug('Design model response received', {
+            provider: designProvider,
+            inputTokens: designResult.usage?.inputTokens ?? 0,
+            outputTokens: designResult.usage?.outputTokens ?? 0,
+            textLength: designResult.text.length,
           });
 
           const designCost = calcCost(
@@ -266,11 +310,18 @@ export async function POST(req: Request) {
           costs.push({ phase: 'design', provider: designProvider, ...designCost });
 
           presentationJson = repairJson(designResult.text);
+          if (presentationJson !== designResult.text) {
+            sendDebug('Design JSON required repair', {
+              originalLength: designResult.text.length,
+              repairedLength: presentationJson.length,
+            }, 'warn');
+          }
         } else {
           /* ═══════ SINGLE-PASS FALLBACK ═══════ */
           sendEvent('phase', { phase: 'researching', message: 'Generating presentation...' });
 
           const model = createModel(designProvider, designKey);
+          sendDebug('Single-pass model request started', { provider: designProvider });
           const result = await generateText({
             model,
             system: buildSystemPrompt(language),
@@ -286,6 +337,13 @@ export async function POST(req: Request) {
             temperature: 0.7,
           });
 
+          sendDebug('Single-pass model response received', {
+            provider: designProvider,
+            inputTokens: result.usage?.inputTokens ?? 0,
+            outputTokens: result.usage?.outputTokens ?? 0,
+            textLength: result.text.length,
+          });
+
           const singleCost = calcCost(
             designProvider,
             result.usage?.inputTokens ?? 0,
@@ -294,9 +352,16 @@ export async function POST(req: Request) {
           costs.push({ phase: 'single', provider: designProvider, ...singleCost });
 
           presentationJson = repairJson(result.text);
+          if (presentationJson !== result.text) {
+            sendDebug('Single-pass JSON required repair', {
+              originalLength: result.text.length,
+              repairedLength: presentationJson.length,
+            }, 'warn');
+          }
         }
 
         // Validate final JSON (repair handles truncated output)
+        sendDebug('Parsing final presentation JSON');
         const presentation = JSON.parse(presentationJson);
 
         // Ensure slides array exists
@@ -304,13 +369,23 @@ export async function POST(req: Request) {
           throw new Error('Generation produced empty slides. Please retry.');
         }
 
+        sendDebug('Presentation JSON validated', {
+          totalSlides: presentation.slides.length,
+          estimatedDuration: presentation.metadata?.estimatedDuration,
+        });
+
         const totalCost = costs.reduce((acc, c) => acc + c.total, 0);
+        sendDebug('Generation pipeline complete', {
+          totalCost,
+          costPhases: costs.map((c) => ({ phase: c.phase, provider: c.provider, total: c.total })),
+        });
         sendEvent('cost', { costs, totalCost });
         sendEvent('phase', { phase: 'complete', message: 'Presentation ready.' });
         sendEvent('result', { presentation });
         controller.close();
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        sendDebug('Generation failed', { error: message }, 'error');
         sendEvent('error', { error: message });
         controller.close();
       }
