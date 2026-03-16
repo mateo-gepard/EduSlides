@@ -218,15 +218,20 @@ export async function POST(req: Request) {
           sendDebug(`${label} still running...`, { elapsedSeconds: elapsed });
         }, heartbeatMs);
 
-        const timeout = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => {
-            timeoutController.abort(new Error(`${label} timed out`));
-            reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s`));
-          }, timeoutMs);
-        });
+        const timeout = timeoutMs > 0
+          ? new Promise<never>((_, reject) => {
+              timeoutId = setTimeout(() => {
+                timeoutController.abort(new Error(`${label} timed out`));
+                reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s`));
+              }, timeoutMs);
+            })
+          : null;
 
         try {
-          return await Promise.race([fn(timeoutController.signal), timeout]);
+          if (timeout) {
+            return await Promise.race([fn(timeoutController.signal), timeout]);
+          }
+          return await fn(timeoutController.signal);
         } finally {
           if (timeoutId) clearTimeout(timeoutId);
           clearInterval(heartbeat);
@@ -240,12 +245,170 @@ export async function POST(req: Request) {
         text: string;
         usage: { inputTokens: number; outputTokens: number };
       }> {
+        function validateEarlyCompletionCandidate(rawJson: string): {
+          ok: boolean;
+          slides: number;
+          narrationSlides: number;
+          narrationChars: number;
+          reasons: string[];
+        } {
+          const reasons: string[] = [];
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(rawJson);
+          } catch {
+            return {
+              ok: false,
+              slides: 0,
+              narrationSlides: 0,
+              narrationChars: 0,
+              reasons: ['invalid-json'],
+            };
+          }
+
+          if (!parsed || typeof parsed !== 'object') {
+            return {
+              ok: false,
+              slides: 0,
+              narrationSlides: 0,
+              narrationChars: 0,
+              reasons: ['root-not-object'],
+            };
+          }
+
+          const root = parsed as {
+            metadata?: unknown;
+            slides?: unknown;
+            generationComplete?: unknown;
+          };
+          const slides = Array.isArray(root.slides) ? root.slides : [];
+          const slideCount = slides.length;
+          if (slideCount === 0) reasons.push('no-slides');
+
+          if (root.metadata == null || typeof root.metadata !== 'object') {
+            reasons.push('missing-metadata');
+          }
+
+          // If model emits an explicit completion marker, respect it.
+          if (root.generationComplete !== undefined && root.generationComplete !== true) {
+            reasons.push('generation-not-complete-marker');
+          }
+
+          const expectedMinSlides = Math.max(4, Math.ceil(duration * 0.6));
+          if (slideCount < expectedMinSlides) {
+            reasons.push(`too-few-slides-${slideCount}-lt-${expectedMinSlides}`);
+          }
+
+          const indexes: number[] = [];
+          let narrationSlides = 0;
+          let narrationChars = 0;
+
+          for (const slide of slides) {
+            if (!slide || typeof slide !== 'object') {
+              reasons.push('slide-not-object');
+              continue;
+            }
+
+            const s = slide as {
+              id?: unknown;
+              index?: unknown;
+              type?: unknown;
+              duration?: unknown;
+              content?: unknown;
+              narration?: unknown;
+            };
+
+            if (typeof s.id !== 'string' || !s.id.trim()) reasons.push('slide-missing-id');
+            if (typeof s.index !== 'number' || !Number.isFinite(s.index)) reasons.push('slide-missing-index');
+            if (typeof s.type !== 'string' || !s.type.trim()) reasons.push('slide-missing-type');
+            if (typeof s.duration !== 'number' || !Number.isFinite(s.duration) || s.duration <= 0) reasons.push('slide-missing-duration');
+            if (!s.content || typeof s.content !== 'object') reasons.push('slide-missing-content');
+
+            if (typeof s.index === 'number' && Number.isFinite(s.index)) {
+              indexes.push(s.index);
+            }
+
+            if (Array.isArray(s.narration) && s.narration.length > 0) {
+              narrationSlides += 1;
+              for (const cue of s.narration) {
+                if (cue && typeof cue === 'object') {
+                  const text = (cue as { text?: unknown }).text;
+                  if (typeof text === 'string') narrationChars += text.length;
+                }
+              }
+            }
+          }
+
+          if (indexes.length > 0) {
+            const sorted = [...indexes].sort((a, b) => a - b);
+            const unique = new Set(sorted);
+            if (unique.size !== sorted.length) reasons.push('duplicate-slide-indexes');
+
+            const start = sorted[0];
+            for (let i = 0; i < sorted.length; i++) {
+              if (sorted[i] !== start + i) {
+                reasons.push('non-contiguous-slide-indexes');
+                break;
+              }
+            }
+          }
+
+          const minNarrationSlides = Math.max(2, Math.ceil(slideCount * 0.4));
+          if (narrationSlides < minNarrationSlides) {
+            reasons.push(`too-few-narration-slides-${narrationSlides}-lt-${minNarrationSlides}`);
+          }
+
+          const minNarrationChars = Math.max(220, slideCount * 45);
+          if (narrationChars < minNarrationChars) {
+            reasons.push(`too-few-narration-chars-${narrationChars}-lt-${minNarrationChars}`);
+          }
+
+          return {
+            ok: reasons.length === 0,
+            slides: slideCount,
+            narrationSlides,
+            narrationChars,
+            reasons,
+          };
+        }
+
         const streamed = streamText(params);
         let text = '';
         let lastEmitLen = 0;
+        let lastJsonProbeLen = 0;
+        let completedByJsonProbe = false;
 
-        for await (const delta of streamed.textStream) {
+        const iterator = streamed.textStream[Symbol.asyncIterator]();
+        let lastDelta = '';
+        let duplicateDeltaCount = 0;
+        let duplicateWarned = false;
+
+        while (true) {
+          const next = await iterator.next();
+          if (next.done) break;
+          const delta = typeof next.value === 'string' ? next.value : '';
           text += delta;
+
+          if (delta && delta === lastDelta) {
+            duplicateDeltaCount += 1;
+          } else {
+            duplicateDeltaCount = 0;
+            duplicateWarned = false;
+            lastDelta = delta;
+          }
+
+          // Keep generation alive; only suppress noisy repeated logs.
+          if (duplicateDeltaCount >= 12) {
+            if (!duplicateWarned) {
+              duplicateWarned = true;
+              sendDebug('Detected repeated model output chunks; suppressing duplicate live output events', {
+                label,
+                repeatedDeltaSample: delta.slice(0, 120),
+              }, 'warn');
+            }
+            continue;
+          }
+
           const shouldEmit = text.length - lastEmitLen >= 260 || delta.includes('\n');
           if (shouldEmit) {
             lastEmitLen = text.length;
@@ -253,16 +416,88 @@ export async function POST(req: Request) {
               label,
               delta,
               textLength: text.length,
-              preview: text.slice(-500),
+              preview: text.slice(-360),
             });
+          }
+
+          // Some providers keep streams open after emitting a complete JSON payload.
+          // Finalize early only when strict validation passes and stream goes quiet briefly.
+          const shouldProbeJson =
+            text.length - lastJsonProbeLen >= 800 ||
+            delta.includes(']}') ||
+            delta.includes('}}');
+          if (shouldProbeJson) {
+            lastJsonProbeLen = text.length;
+            try {
+              const candidate = extractJson(text);
+              const candidateValidation = validateEarlyCompletionCandidate(candidate);
+              if (candidateValidation.ok) {
+                const quietWindowMs = 1200;
+                const nextDuringQuietWindow = await Promise.race([
+                  iterator.next(),
+                  new Promise<null>((resolve) => {
+                    setTimeout(() => resolve(null), quietWindowMs);
+                  }),
+                ]);
+
+                // If stream continues producing output, do not early-complete yet.
+                if (nextDuringQuietWindow && !nextDuringQuietWindow.done) {
+                  const continuedDelta = typeof nextDuringQuietWindow.value === 'string'
+                    ? nextDuringQuietWindow.value
+                    : '';
+                  text += continuedDelta;
+                  continue;
+                }
+
+                completedByJsonProbe = true;
+                text = candidate;
+                sendDebug('Detected complete JSON payload before stream closed; finalizing early', {
+                  label,
+                  textLength: text.length,
+                  slides: candidateValidation.slides,
+                  narrationSlides: candidateValidation.narrationSlides,
+                  narrationChars: candidateValidation.narrationChars,
+                }, 'warn');
+                if (typeof iterator.return === 'function') {
+                  try {
+                    await iterator.return();
+                  } catch {
+                    // Best-effort iterator shutdown.
+                  }
+                }
+                break;
+              } else {
+                sendDebug('Early completion candidate rejected by validator', {
+                  label,
+                  reasons: candidateValidation.reasons.slice(0, 6),
+                  slides: candidateValidation.slides,
+                  narrationSlides: candidateValidation.narrationSlides,
+                  narrationChars: candidateValidation.narrationChars,
+                });
+              }
+            } catch {
+              // Not complete yet; continue reading stream.
+            }
           }
         }
 
         let usageRaw: { inputTokens?: number; outputTokens?: number } | null = null;
-        try {
-          usageRaw = await Promise.resolve(streamed.usage as PromiseLike<{ inputTokens?: number; outputTokens?: number }>);
-        } catch {
-          usageRaw = null;
+        if (!completedByJsonProbe) {
+          try {
+            usageRaw = await Promise.race([
+              Promise.resolve(streamed.usage as PromiseLike<{ inputTokens?: number; outputTokens?: number }>),
+              new Promise<null>((resolve) => {
+                setTimeout(() => resolve(null), 5000);
+              }),
+            ]);
+            if (!usageRaw) {
+              sendDebug('Usage metadata timed out; continuing with 0-token fallback', { label }, 'warn');
+            }
+          } catch {
+            usageRaw = null;
+          }
+        } else {
+          sendDebug('Skipped usage wait due to early JSON completion', { label });
         }
         return {
           text,
@@ -356,7 +591,8 @@ export async function POST(req: Request) {
             provider: designProvider,
             maxOutputTokens: designMaxTokens,
           });
-          const designTimeoutMs = 180_000;
+          // Do not force-terminate long-running design generations.
+          const designTimeoutMs = 0;
           let designResult: Awaited<ReturnType<typeof generateTextLive>> | null = null;
           let designError: Error | null = null;
 
