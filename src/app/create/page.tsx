@@ -767,7 +767,7 @@ export default function CreatePage() {
                 </motion.button>
               )}
 
-              {phase === 'idle' && process.env.NODE_ENV === 'development' && (
+              {phase === 'idle' && (
                 <button
                   onClick={handleDevGenerate}
                   className="w-full mt-2 py-3 text-sm rounded-xl border border-dashed border-yellow-500/30 text-yellow-400/70 hover:bg-yellow-500/5 transition-colors"
