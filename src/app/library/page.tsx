@@ -68,6 +68,34 @@ export default function LibraryPage() {
   }, [loadPresentations]);
 
   const handlePlay = (saved: SavedPresentation) => {
+    const legacyTtsProvider = saved.cost?.costs.find((c) => c.phase === 'tts')?.provider;
+    const scriptProvider =
+      saved.config.scriptProvider === 'gemini' ||
+      saved.config.scriptProvider === 'anthropic' ||
+      saved.config.scriptProvider === 'openai'
+        ? saved.config.scriptProvider
+        : 'gemini';
+    const designProvider =
+      saved.config.designProvider === 'anthropic' ||
+      saved.config.designProvider === 'anthropic-haiku' ||
+      saved.config.designProvider === 'openai'
+        ? saved.config.designProvider
+        : 'anthropic';
+    const ttsProvider =
+      saved.config.ttsProvider === 'openai' || saved.config.ttsProvider === 'elevenlabs'
+        ? saved.config.ttsProvider
+        : (legacyTtsProvider === 'openai' || legacyTtsProvider === 'elevenlabs' ? legacyTtsProvider : 'browser');
+
+    store.setConfig({
+      topic: saved.config.topic,
+      subject: saved.config.subject,
+      depth: saved.config.depth,
+      duration: saved.config.duration,
+      language: saved.config.language,
+      scriptProvider,
+      designProvider,
+      ttsProvider,
+    });
     store.setPresentation(saved.presentation);
     if (saved.cost) {
       store.setGenerationCost({

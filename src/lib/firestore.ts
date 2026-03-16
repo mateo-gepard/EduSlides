@@ -25,6 +25,7 @@ export interface SavedPresentation {
     language: string;
     scriptProvider: string;
     designProvider: string;
+    ttsProvider?: 'browser' | 'openai' | 'elevenlabs';
   };
   cost?: {
     totalCost: number;

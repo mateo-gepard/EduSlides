@@ -39,7 +39,7 @@ function fmt(s: number) {
 export default function PlayerPage() {
   const router = useRouter();
   const store = usePresentationStore();
-  const { presentation, audioMap, currentIndex, isPlaying, volume, showSubtitles } = store;
+  const { presentation, audioMap, currentIndex, isPlaying, volume, showSubtitles, config } = store;
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -50,8 +50,8 @@ export default function PlayerPage() {
   const [subtitle, setSubtitle] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [showThumbnails, setShowThumbnails] = useState(false);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const ttsGeneratingRef = useRef<Set<string>>(new Set());
 
   const slides = presentation?.slides || [];
   const slide = slides[currentIndex];
@@ -59,12 +59,21 @@ export default function PlayerPage() {
 
   /* ─── Lock body scroll ─── */
   useEffect(() => {
-    const prev = document.body.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyPosition = document.body.style.position;
+    const prevBodyWidth = document.body.style.width;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
     document.documentElement.style.overflow = 'hidden';
+
     return () => {
-      document.body.style.overflow = prev;
-      document.documentElement.style.overflow = '';
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.position = prevBodyPosition;
+      document.body.style.width = prevBodyWidth;
+      document.documentElement.style.overflow = prevHtmlOverflow;
     };
   }, []);
 
@@ -111,13 +120,9 @@ export default function PlayerPage() {
   useEffect(() => {
     stopAudio();
     if (!slide || !isPlaying) return;
-    const audioUrl = audioMap[slide.id];
-    if (audioUrl) {
-      const audio = new Audio(audioUrl);
-      audio.volume = volume;
-      audioRef.current = audio;
-      audio.play().catch(() => {});
-    } else if (slide.narration?.length) {
+
+    const playBrowserTts = () => {
+      if (!slide.narration?.length) return;
       const text = slide.narration.map((n) => n.text).join(' ');
       if (text && typeof window !== 'undefined' && window.speechSynthesis) {
         const utt = new SpeechSynthesisUtterance(text);
@@ -126,9 +131,50 @@ export default function PlayerPage() {
         synthRef.current = utt;
         window.speechSynthesis.speak(utt);
       }
+    };
+
+    const audioUrl = audioMap[slide.id];
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.volume = volume;
+      audioRef.current = audio;
+      audio.play().catch(() => {});
+    } else if (config.ttsProvider !== 'browser' && slide.narration?.length) {
+      if (!ttsGeneratingRef.current.has(slide.id)) {
+        ttsGeneratingRef.current.add(slide.id);
+        const text = slide.narration.map((n) => n.text).join(' ');
+        fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, provider: config.ttsProvider }),
+        })
+          .then(async (res) => {
+            if (!res.ok) throw new Error('TTS generation failed');
+            const blob = await res.blob();
+            const generatedUrl = URL.createObjectURL(blob);
+            store.setAudio(slide.id, generatedUrl);
+
+            // If user is still on this slide and playing, start generated audio immediately.
+            if (store.currentIndex === currentIndex && store.isPlaying) {
+              stopAudio();
+              const audio = new Audio(generatedUrl);
+              audio.volume = volume;
+              audioRef.current = audio;
+              audio.play().catch(() => {});
+            }
+          })
+          .catch(() => {
+            playBrowserTts();
+          })
+          .finally(() => {
+            ttsGeneratingRef.current.delete(slide.id);
+          });
+      }
+    } else if (slide.narration?.length) {
+      playBrowserTts();
     }
     return stopAudio;
-  }, [currentIndex, isPlaying, audioMap, slide, volume, stopAudio, store.config.ttsProvider]);
+  }, [currentIndex, isPlaying, audioMap, slide, volume, stopAudio, config.ttsProvider, store]);
 
   useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, [volume]);
 
@@ -144,12 +190,11 @@ export default function PlayerPage() {
         case 'f': toggleFullscreen(); break;
         case 's': store.setShowSubtitles(!showSubtitles); break;
         case 'm': store.setVolume(volume > 0 ? 0 : 0.8); break;
-        case 'Escape': if (showThumbnails) setShowThumbnails(false); break;
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [store, showSubtitles, volume, showThumbnails]);
+  }, [store, showSubtitles, volume]);
 
   /* ─── Fullscreen ─── */
   const toggleFullscreen = () => {
@@ -176,8 +221,6 @@ export default function PlayerPage() {
   const trans = slide.transition || 'fade';
   const v = variants[trans] || variants.fade;
   const progress = slide.duration > 0 ? Math.min(elapsed / slide.duration, 1) : 0;
-  const globalProgress = ((currentIndex + progress) / totalSlides) * 100;
-
   return (
     <div
       className="player-shell"
@@ -221,6 +264,22 @@ export default function PlayerPage() {
               </div>
             </div>
           </div>
+
+          {/* Explicit nav buttons on slide itself */}
+          <button
+            onClick={() => store.prev()}
+            disabled={currentIndex === 0}
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/35 backdrop-blur-sm border border-white/10 text-white/80 hover:text-white disabled:opacity-25"
+          >
+            <ChevronLeft className="w-5 h-5 mx-auto" />
+          </button>
+          <button
+            onClick={() => store.next()}
+            disabled={currentIndex >= totalSlides - 1}
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/35 backdrop-blur-sm border border-white/10 text-white/80 hover:text-white disabled:opacity-25"
+          >
+            <ChevronRight className="w-5 h-5 mx-auto" />
+          </button>
         </div>
       </div>
 
@@ -283,12 +342,6 @@ export default function PlayerPage() {
         className="absolute bottom-0 inset-x-0 z-20 pointer-events-none"
       >
         <div className="player-controls pointer-events-auto">
-          {/* Global progress (thin line at very bottom) */}
-          <div className="absolute bottom-0 inset-x-0 h-[3px] bg-white/[0.06]">
-            <div className="h-full bg-indigo-500/50 transition-all duration-200"
-              style={{ width: `${globalProgress}%` }} />
-          </div>
-
           {/* Slide progress bar */}
           <div className="px-4 pt-3 pb-1">
             <div

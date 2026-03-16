@@ -20,9 +20,16 @@ const SAMPLES = 200; // resolution of plotted curves
  */
 function evalExpr(expr: string, x: number): number {
   try {
+    // Accept common model output forms like "f(x)=x^2" or Unicode math symbols.
+    const eqIndex = expr.indexOf('=');
+    const rhs = eqIndex >= 0 ? expr.slice(eqIndex + 1) : expr;
+
     // Normalise expression
-    let e = expr
+    let e = rhs
       .replace(/\s+/g, '')
+      .replace(/[−–—]/g, '-')
+      .replace(/[×·]/g, '*')
+      .replace(/[÷]/g, '/')
       .replace(/\^/g, '**')
       .replace(/(?<!\w)pi(?!\w)/gi, `(${Math.PI})`)
       .replace(/(?<!\w)e(?!\w)/gi, `(${Math.E})`)
@@ -60,12 +67,16 @@ function evalExpr(expr: string, x: number): number {
 }
 
 export default function GraphSlide({ content }: { content: GraphContent }) {
-  const functions = content.functions || [];
-  const dataPoints = content.dataPoints || [];
-
-  // Also support legacy "series" field (backward compat)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = content as any;
+
+  // Support both canonical shape and model outputs that nest graph payload in content.data.
+  const functions = (content.functions || raw.data?.functions || []) as NonNullable<GraphContent['functions']>;
+  const dataPoints = (content.dataPoints || raw.data?.dataPoints || []) as NonNullable<GraphContent['dataPoints']>;
+  const xRange = content.xRange || raw.data?.xRange;
+  const yRange = content.yRange || raw.data?.yRange;
+
+  // Also support legacy "series" field (backward compat)
   const legacySeries: typeof dataPoints = raw.series
     ? (raw.series as { label: string; color: string; points: { x: number; y: number }[] }[]).map(s => ({
         label: s.label,
@@ -80,7 +91,7 @@ export default function GraphSlide({ content }: { content: GraphContent }) {
   /* ── Sample function curves ── */
   const sampledCurves = useMemo(() => {
     if (functions.length === 0) return [];
-    const [xLo, xHi] = content.xRange || [-10, 10];
+    const [xLo, xHi] = xRange || [-10, 10];
     const step = (xHi - xLo) / SAMPLES;
     return functions.map((fn) => {
       const pts: { x: number; y: number }[] = [];
@@ -91,12 +102,12 @@ export default function GraphSlide({ content }: { content: GraphContent }) {
       }
       return { ...fn, points: pts };
     });
-  }, [functions, content.xRange]);
+  }, [functions, xRange]);
 
   /* ── Compute visual axis ranges ── */
   const { xMin, xMax, yMin, yMax } = useMemo(() => {
-    if (content.xRange && content.yRange) {
-      return { xMin: content.xRange[0], xMax: content.xRange[1], yMin: content.yRange[0], yMax: content.yRange[1] };
+    if (xRange && yRange) {
+      return { xMin: xRange[0], xMax: xRange[1], yMin: yRange[0], yMax: yRange[1] };
     }
     let xLo = Infinity, xHi = -Infinity, yLo = Infinity, yHi = -Infinity;
     for (const c of sampledCurves) {
@@ -118,12 +129,12 @@ export default function GraphSlide({ content }: { content: GraphContent }) {
     if (!isFinite(xLo)) { xLo = -10; xHi = 10; yLo = -10; yHi = 10; }
     const yPad = (yHi - yLo) * 0.1 || 1;
     return {
-      xMin: content.xRange?.[0] ?? xLo,
-      xMax: content.xRange?.[1] ?? xHi,
-      yMin: content.yRange?.[0] ?? (yLo - yPad),
-      yMax: content.yRange?.[1] ?? (yHi + yPad),
+      xMin: xRange?.[0] ?? xLo,
+      xMax: xRange?.[1] ?? xHi,
+      yMin: yRange?.[0] ?? (yLo - yPad),
+      yMax: yRange?.[1] ?? (yHi + yPad),
     };
-  }, [sampledCurves, allData, content.xRange, content.yRange]);
+  }, [sampledCurves, allData, xRange, yRange]);
 
   const sx = (x: number) => PAD.left + ((x - xMin) / (xMax - xMin || 1)) * INNER_W;
   const sy = (y: number) => PAD.top + INNER_H - ((y - yMin) / (yMax - yMin || 1)) * INNER_H;

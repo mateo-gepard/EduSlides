@@ -30,7 +30,7 @@ Your output format:
     {
       "heading": "Section heading",
       "keyPoints": ["Key fact 1", "Key fact 2", "Key fact 3"],
-      "narration": "Full spoken narration for this section. Write naturally, as if you're an expert teacher speaking to engaged students. 3-6 sentences per section. Be conversational but precise. NEVER use emoji anywhere.",
+      "narration": "Full spoken narration for this section. Write naturally, as if you're an expert teacher speaking to engaged students. MINIMUM 4-8 sentences per section — explain concepts thoroughly, give real-world analogies, pause for emphasis, connect ideas to prior sections. Do NOT just state facts — teach them. Be conversational but precise. NEVER use emoji anywhere.",
       "suggestedVisual": "<one of the 25 types listed below>",
       "data": { <optional structured data relevant to the visual: statistics, table rows, step names, timeline events, comparison columns, diagram nodes, formulas, graph points, quotes — whatever the visual type needs> },
       "imageQuery": "<optional — only when a real photograph would genuinely help: portraits of people, historical events, organisms, landmarks, artworks. Specific search query like 'Charles Darwin portrait photograph'. Omit for most sections.>"
@@ -58,7 +58,11 @@ MATH / PHYSICS / ENGINEERING:
 - HEAVILY use: formula (LaTeX equations, derivations), graph (mathematical function plots with expressions like "x^2", "sin(x)"), data-table (values, calculations), process (proofs, derivations)
 - MODERATELY use: diagram (circuits, force diagrams), big-statement (key equations), stats, chart
 - RARELY use: funfact, image-spotlight, quote
-- When data exists: provide "data.formula" (LaTeX string), "data.functions" (array of math expressions like [{expression:"x^2", label:"f(x)=x²"}]), "data.xRange", "data.yRange", "data.steps" (derivation steps)
+- For math function plots, ALWAYS provide graph payload as:
+  data.graphType = "function"
+  data.functions = [{ expression: "x^2", label: "f(x)=x²", color: "#hex" }]
+  data.xRange = [min, max], data.yRange = [min, max]
+  (Do not use dataPoints unless showing measured/empirical values.)
 
 HISTORY / SOCIAL SCIENCES / POLITICS:
 - HEAVILY use: timeline, image-spotlight (with imageQuery for historical photos), quote (from historical figures), funfact
@@ -91,13 +95,18 @@ ECONOMICS / BUSINESS:
 - HEAVILY use: chart (market data, trends), graph (supply/demand, growth curves), stats, data-table, comparison
 - MODERATELY use: infographic, process, ranked, scenario, cycle
 - RARELY use: formula (unless equations), code, image-spotlight
+- For economics/business graphs, ALWAYS provide graph payload as:
+  data.graphType = "data" or "multi"
+  data.dataPoints = [{ label, color, points:[{x,y},...], showLine:true }]
+  data.xRange = [min, max], data.yRange = [min, max]
+  (Prefer data-driven lines over symbolic function expressions.)
 
 GENERAL / MIXED:
 - Use a balanced mix of all types. Aim for maximum visual variety.
 
 RULES:
 - Research the topic thoroughly. Include real statistics, real terminology, real citations.
-- Every section needs a "narration" field with natural spoken text (3-6 sentences).
+- Every section needs a "narration" field with natural spoken text (MINIMUM 4-8 sentences). Explain, don't just state. Use analogies, give context, connect to real life. Think like a great teacher giving a mini-lecture, not someone reading bullet points.
 - "suggestedVisual" tells the designer what visual representation fits best. Follow the SUBJECT-SPECIFIC rules above.
 - Use at LEAST 8 different visual types. Use the NEW types (formula, graph, quote, infographic, image-spotlight, funfact, definition, code) when they match the subject.
 - The "data" field supplies structured information the designer needs. Be thorough:
@@ -114,7 +123,9 @@ RULES:
 - All content in ${language}.
 - NEVER use emoji anywhere — not in narration, not in data, not in headings.
 - Optionally add "imageQuery" to sections where a real photograph would genuinely aid understanding. Maximum 5 per presentation for image-spotlight type.
-- For a 5-minute presentation, produce 10-12 sections. Scale proportionally for other durations.`;
+- For a 5-minute presentation, produce 10-12 sections. Scale proportionally for other durations.
+- Each section's narration should be substantial enough to fill 15-30 seconds of speaking time (roughly 40-80 words per section).
+- Suggest a "duration" in seconds for each section in the data field (title: 8-10s, content: 15-30s, quiz: 20-30s, outro: 8-10s). The designer will use these.`;
 }
 
 export function buildScriptUserPrompt(params: {
@@ -183,9 +194,11 @@ SLIDE STRUCTURE:
 
 NARRATION RULES:
 - Split the script's narration into timed cues. narration[0].t = 0 always.
-- Each cue = 1-2 natural spoken sentences.
-- Space cues 3-6 seconds apart.
-- Slide duration = (number of cues × average spacing) rounded up. Usually 15-30 seconds per content slide.
+- Each cue = 1-2 natural spoken sentences. A content slide should have 3-6 cues minimum.
+- Space cues 3-5 seconds apart depending on sentence length.
+- Slide duration = (number of cues × average spacing) rounded up.
+- DURATION GUIDE: title = 8-10s, content slides = 15-30s, quiz = 20-30s, summary = 12-18s, outro = 8-10s.
+- NEVER set duration to 60 seconds. Most slides should be 15-25 seconds. Total of all durations must roughly match target minutes × 60.
 
 ═══════════════════════════════════════
 ALL 25 SLIDE TYPES — EXACT JSON SCHEMAS
@@ -337,7 +350,13 @@ STRUCTURE:
 - First slide: "title". Last slide: "outro". Second-to-last: "summary".
 - Insert a "quiz" slide after every 3-4 content slides.
 - Use at LEAST 10 distinct slide types per presentation. The new types MUST appear when appropriate.
-- Total duration must match the script's target.
+- Total of all slide durations MUST roughly equal the target minutes × 60 seconds.
+- DURATION PER SLIDE: title = 8-10s, content = 15-25s, quiz = 20-30s, summary = 12-18s, outro = 8-10s. NEVER use 60 seconds.
+
+HYBRID CUSTOM SLIDES:
+- Most slides should use one of the 25 streamlined types above.
+- However, for 1-3 slides per presentation, you may create FULLY CUSTOM visual layouts by using any type but adding significantly richer, deeper content — extra data, more cards, more steps, longer descriptions. These "hero" slides should be the most visually impressive moments of the presentation.
+- Pick the most impactful topic moments for these hero slides (e.g., the central thesis, a stunning data visualization, a critical comparison).
 
 BACKGROUNDS — ALWAYS LIGHT:
 - Every slide.background: a unique LIGHT CSS gradient. NEVER dark or black.
@@ -368,7 +387,10 @@ CONTENT:
 - Sources: from script's sources array.
 - Text: proper capitalization, complete sentences, no abbreviations in headings.
 - LaTeX formulas: use proper syntax (\\\\frac, \\\\sqrt, \\\\int, \\\\sum, Greek letters, etc.).
-- Graph: use mathematical expressions in functions[].expression (e.g. "x^2", "sin(x)", "exp(-x^2)"). Always set xRange and yRange. For data plots use dataPoints.
+- Graph: CRITICAL — the "functions" array and "xRange"/"yRange" MUST be placed directly inside the slide's "content" object (NOT nested inside a "data" sub-object). Example: content.functions = [{"expression":"x^2","label":"f(x)=x²","color":"#7c3aed"}], content.xRange = [0,10], content.yRange = [0,100]. Always provide both xRange AND yRange. Use math expressions like "x^2", "sin(x)", "exp(-x^2)".
+- Graph mode selection:
+  * Math/physics/engineering: graphType MUST be "function" and include content.functions.
+  * Economics/business/social stats: graphType MUST be "data" or "multi" and include content.dataPoints.
 - Code: preserve exact code from script data, use \\n for line breaks.
 
 IMAGES:
@@ -502,7 +524,16 @@ SUBJECT-AWARE RULES:
 - LITERATURE: Use quote, definition, big-statement, comparison heavily. Avoid formula, code.
 - ECONOMICS: Use chart, graph, stats, data-table, comparison heavily.
 
-RULES: First=title, last=outro, 10+ distinct types, quiz every 3-4 slides, unique LIGHT backgrounds (soft pastels matching subject), real data, timed narration (t=0 first), all content in ${language}. NEVER use emoji — all icon fields use descriptive names like "brain", "heart", "chart", "lightbulb" etc. Use the new types (formula, graph, quote, infographic, image-spotlight, funfact, definition, code) when they match the subject.`;
+GRAPH CONVENTIONS:
+- Math/physics/engineering: graphType MUST be "function" and include functions[] with expressions like "x^2", "sin(x)", "exp(-x^2)".
+- Economics/business: graphType MUST be "data" or "multi" and include dataPoints[] time-series/market points with showLine=true.
+- Always include xRange and yRange.
+
+RULES: First=title, last=outro, 10+ distinct types, quiz every 3-4 slides, unique LIGHT backgrounds (soft pastels matching subject), real data, timed narration (t=0 first, 3-6 cues per content slide spaced 3-5s apart), all content in ${language}. NEVER use emoji — all icon fields use descriptive names like "brain", "heart", "chart", "lightbulb" etc. Use the new types (formula, graph, quote, infographic, image-spotlight, funfact, definition, code) when they match the subject.
+DURATION PER SLIDE: title=8-10s, content=15-25s, quiz=20-30s, summary=12-18s, outro=8-10s. NEVER set any slide to 60s. Total of all durations must roughly equal target minutes × 60.
+NARRATION: Write substantial narration — each content slide needs 4-8 sentences of teaching, explanation, and context. Split into timed cues.
+GRAPH TYPE: Place functions[], xRange, yRange DIRECTLY in the content object (NOT nested in a data sub-object). Always provide both xRange and yRange.
+HYBRID: For 1-3 slides, create especially rich "hero" content — extra data, more cards/steps, deeper descriptions — for the most impactful moments.`;
 }
 
 export function buildUserPrompt(params: {

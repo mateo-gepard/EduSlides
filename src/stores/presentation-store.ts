@@ -80,7 +80,7 @@ export const usePresentationStore = create<PresentationState>((set, get) => ({
   generationCost: null,
   config: defaultConfig,
 
-  setPresentation: (p) => set({ presentation: p, currentIndex: 0 }),
+  setPresentation: (p) => set({ presentation: p, currentIndex: 0, audioMap: {} }),
   setAudio: (id, url) =>
     set((s) => ({ audioMap: { ...s.audioMap, [id]: url } })),
   setCurrentIndex: (i) => set({ currentIndex: i }),

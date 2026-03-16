@@ -221,6 +221,15 @@ export default function CreatePage() {
 
         // Phase 3: Generate TTS audio (if not browser)
         if (config.ttsProvider !== 'browser') {
+          const getAudioDurationSeconds = (url: string) =>
+            new Promise<number>((resolve) => {
+              const audio = new Audio();
+              audio.preload = 'metadata';
+              audio.onloadedmetadata = () => resolve(Number.isFinite(audio.duration) ? audio.duration : 0);
+              audio.onerror = () => resolve(0);
+              audio.src = url;
+            });
+
           const narrationSlides = pendingPresentation.slides.filter(
             (s) => s.narration?.length,
           );
@@ -250,6 +259,13 @@ export default function CreatePage() {
                       const url = URL.createObjectURL(blob);
                       store.setAudio(slide.id, url);
                       totalTtsChars += text.length;
+
+                      // Orient slide duration by generated audio length (with thinking/pause room).
+                      const audioDuration = await getAudioDurationSeconds(url);
+                      if (audioDuration > 0) {
+                        const orientedDuration = Math.round((audioDuration * 1.18) + 1.5);
+                        slide.duration = Math.max(8, Math.min(45, orientedDuration));
+                      }
                     }
                   } catch {
                     /* TTS for individual slides is best-effort */
@@ -276,6 +292,11 @@ export default function CreatePage() {
                 totalCost: (existing?.totalCost ?? 0) + ttsCost,
               });
             }
+
+            // Refresh presentation timing after TTS-adjusted durations.
+            const totalSeconds = pendingPresentation.slides.reduce((acc, s) => acc + (s.duration || 0), 0);
+            pendingPresentation.metadata.estimatedDuration = Math.max(1, Math.round(totalSeconds / 60));
+            store.setPresentation(pendingPresentation);
           }
         }
 
@@ -293,6 +314,7 @@ export default function CreatePage() {
             language: config.language,
             scriptProvider: config.scriptProvider,
             designProvider: config.designProvider,
+            ttsProvider: config.ttsProvider,
           },
           costData ? { totalCost: costData.totalCost, costs: costData.costs } : undefined,
         ).catch((e) => { console.warn('[EduSlides] Firestore save failed:', e); });
