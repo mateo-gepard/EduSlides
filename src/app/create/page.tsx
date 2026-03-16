@@ -228,6 +228,18 @@ export default function CreatePage() {
                     meta: data.meta,
                   });
                   break;
+                case 'model-output':
+                  pushLog({
+                    ts: new Date().toISOString(),
+                    level: 'info',
+                    message: `Live output: ${data.label || 'model'}`,
+                    meta: {
+                      textLength: data.textLength,
+                      delta: data.delta,
+                      preview: data.preview,
+                    },
+                  });
+                  break;
                 case 'result':
                   pendingPresentation = data.presentation as Presentation;
                   pushLog({

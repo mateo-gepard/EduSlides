@@ -1,4 +1,4 @@
-import { generateText } from 'ai';
+import { streamText } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -207,11 +207,12 @@ export async function POST(req: Request) {
       async function runWithTimeoutAndHeartbeat<T>(
         label: string,
         timeoutMs: number,
-        fn: () => Promise<T>,
+        fn: (signal: AbortSignal) => Promise<T>,
       ): Promise<T> {
         const started = Date.now();
         const heartbeatMs = 15_000;
         let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        const timeoutController = new AbortController();
         const heartbeat = setInterval(() => {
           const elapsed = Math.round((Date.now() - started) / 1000);
           sendDebug(`${label} still running...`, { elapsedSeconds: elapsed });
@@ -219,16 +220,57 @@ export async function POST(req: Request) {
 
         const timeout = new Promise<never>((_, reject) => {
           timeoutId = setTimeout(() => {
+            timeoutController.abort(new Error(`${label} timed out`));
             reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s`));
           }, timeoutMs);
         });
 
         try {
-          return await Promise.race([fn(), timeout]);
+          return await Promise.race([fn(timeoutController.signal), timeout]);
         } finally {
           if (timeoutId) clearTimeout(timeoutId);
           clearInterval(heartbeat);
         }
+      }
+
+      async function generateTextLive(
+        params: Parameters<typeof streamText>[0] & { abortSignal?: AbortSignal },
+        label: string,
+      ): Promise<{
+        text: string;
+        usage: { inputTokens: number; outputTokens: number };
+      }> {
+        const streamed = streamText(params);
+        let text = '';
+        let lastEmitLen = 0;
+
+        for await (const delta of streamed.textStream) {
+          text += delta;
+          const shouldEmit = text.length - lastEmitLen >= 260 || delta.includes('\n');
+          if (shouldEmit) {
+            lastEmitLen = text.length;
+            sendEvent('model-output', {
+              label,
+              delta,
+              textLength: text.length,
+              preview: text.slice(-500),
+            });
+          }
+        }
+
+        let usageRaw: { inputTokens?: number; outputTokens?: number } | null = null;
+        try {
+          usageRaw = await Promise.resolve(streamed.usage as PromiseLike<{ inputTokens?: number; outputTokens?: number }>);
+        } catch {
+          usageRaw = null;
+        }
+        return {
+          text,
+          usage: {
+            inputTokens: usageRaw?.inputTokens ?? 0,
+            outputTokens: usageRaw?.outputTokens ?? 0,
+          },
+        };
       }
 
       try {
@@ -252,7 +294,7 @@ export async function POST(req: Request) {
 
           const scriptModel = createModel(scriptProvider, scriptKey);
           sendDebug('Script model request started', { provider: scriptProvider });
-          const scriptResult = await generateText({
+          const scriptResult = await generateTextLive({
             model: scriptModel,
             system: buildScriptSystemPrompt(language),
             prompt: buildScriptUserPrompt({
@@ -265,7 +307,7 @@ export async function POST(req: Request) {
             }),
             maxOutputTokens: 12000,
             temperature: 0.7,
-          });
+          }, 'script');
 
           sendDebug('Script model response received', {
             provider: scriptProvider,
@@ -315,7 +357,7 @@ export async function POST(req: Request) {
             maxOutputTokens: designMaxTokens,
           });
           const designTimeoutMs = 180_000;
-          let designResult: Awaited<ReturnType<typeof generateText>> | null = null;
+          let designResult: Awaited<ReturnType<typeof generateTextLive>> | null = null;
           let designError: Error | null = null;
 
           const attemptTokenBudgets = [
@@ -337,13 +379,14 @@ export async function POST(req: Request) {
               designResult = await runWithTimeoutAndHeartbeat(
                 `Design model attempt ${attempt + 1}`,
                 designTimeoutMs,
-                () => generateText({
+                (signal) => generateTextLive({
                   model: designModel,
                   system: designSystemPrompt,
                   prompt: designUserPrompt,
                   maxOutputTokens: maxTokens,
                   temperature: 0.4,
-                }),
+                  abortSignal: signal,
+                }, 'design'),
               );
               designError = null;
               break;
@@ -390,7 +433,7 @@ export async function POST(req: Request) {
 
           const model = createModel(designProvider, designKey);
           sendDebug('Single-pass model request started', { provider: designProvider });
-          const result = await generateText({
+          const result = await generateTextLive({
             model,
             system: buildSystemPrompt(language),
             prompt: buildUserPrompt({
@@ -403,7 +446,7 @@ export async function POST(req: Request) {
             }),
             maxOutputTokens: 16000,
             temperature: 0.7,
-          });
+          }, 'single-pass');
 
           sendDebug('Single-pass model response received', {
             provider: designProvider,
