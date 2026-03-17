@@ -60,6 +60,11 @@ function createModel(provider: string, apiKey: string): any {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createFastGeminiModel(apiKey: string): any {
+  return createGoogleGenerativeAI({ apiKey })('gemini-2.0-flash');
+}
+
 function extractJson(text: string): string {
   const match = text.match(/\{[\s\S]*\}/);
   if (match) return match[0];
@@ -273,6 +278,15 @@ export async function POST(req: Request) {
         return text;
       }
 
+      async function withTimeout<T>(label: string, timeoutMs: number, fn: () => Promise<T>): Promise<T> {
+        return await Promise.race([
+          fn(),
+          new Promise<T>((_, reject) => {
+            setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
+          }),
+        ]);
+      }
+
       async function enrichPresentationImages(presentation: Record<string, unknown>) {
         const slidesRaw = presentation.slides;
         if (!Array.isArray(slidesRaw) || slidesRaw.length === 0) return;
@@ -318,15 +332,32 @@ export async function POST(req: Request) {
           }
         }
 
+        sendDebug('Image enrichment: candidate collection started', {
+          targetSlides: targetSlides.length,
+          desiredImages,
+          isHistoryLike,
+        });
+
         const candidatesById: Record<string, { query: string; candidates: string[] }> = {};
-        await Promise.all(
-          targetSlides.map(async (s) => {
-            const query = (s.imageQuery || '').trim();
-            if (!query) return;
-            const candidates = await fetchBingImageCandidates(query);
-            candidatesById[s.id] = { query, candidates };
-          }),
-        );
+        await withTimeout('image candidate collection', 10_000, async () => {
+          await Promise.allSettled(
+            targetSlides.map(async (s) => {
+              const query = (s.imageQuery || '').trim();
+              if (!query) return;
+              const candidates = await fetchBingImageCandidates(query);
+              candidatesById[s.id] = { query, candidates };
+            }),
+          );
+        }).catch((error) => {
+          sendDebug('Image enrichment: candidate collection timed out; continuing with partial results', {
+            error: error instanceof Error ? error.message : String(error),
+          }, 'warn');
+        });
+
+        sendDebug('Image enrichment: candidate collection complete', {
+          candidateSlides: Object.keys(candidatesById).length,
+          candidateCount: Object.values(candidatesById).reduce((sum, entry) => sum + entry.candidates.length, 0),
+        });
 
         const geminiKey = resolveKey('gemini');
         if (geminiKey) {
@@ -345,12 +376,19 @@ export async function POST(req: Request) {
               })),
             };
 
-            const geminiText = await collectText({
-              model: createModel('gemini', geminiKey),
-              system: `You assign best image URLs for slides.\nRules:\n- Return JSON only: {"images":[{"id":"slide-id","imageUrl":"https://...","imageQuery":"..."}]}\n- Use only provided candidate URLs when available.\n- Prefer distinct URLs across slides; avoid repeating same URL.\n- Prioritize historical photographs for history topics.\n- Keep at least ${Math.max(3, Math.floor(desiredImages * 0.7))} distinct slide-image assignments.`,
-              prompt: JSON.stringify(selectionPrompt),
-              maxOutputTokens: 3000,
-              temperature: 0.2,
+            sendDebug('Image enrichment: Gemini linker started', {
+              model: 'gemini-2.0-flash',
+              slideCount: targetSlides.length,
+            });
+
+            const geminiText = await withTimeout('gemini image linker', 12_000, async () => {
+              return await collectText({
+                model: createFastGeminiModel(geminiKey),
+                system: `You assign best image URLs for slides.\nRules:\n- Return JSON only: {"images":[{"id":"slide-id","imageUrl":"https://...","imageQuery":"..."}]}\n- Use only provided candidate URLs when available.\n- Prefer distinct URLs across slides; avoid repeating same URL.\n- Prioritize historical photographs for history topics.\n- Keep at least ${Math.max(3, Math.floor(desiredImages * 0.7))} distinct slide-image assignments.`,
+                prompt: JSON.stringify(selectionPrompt),
+                maxOutputTokens: 1800,
+                temperature: 0.2,
+              });
             });
 
             const parsed = JSON.parse(repairJson(geminiText)) as {
