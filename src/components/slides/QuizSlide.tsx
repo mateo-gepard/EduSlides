@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { QuizContent } from '@/lib/types';
+import { usePresentationStore } from '@/stores/presentation-store';
 
 const CORRECT_PHRASES = [
   "That's correct! Nice work.",
@@ -23,18 +24,40 @@ export default function QuizSlide({ content }: { content: QuizContent }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
+  const { config, volume } = usePresentationStore();
 
   const q = questions[current];
 
   const speakFeedback = useCallback((correct: boolean) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
     const phrases = correct ? CORRECT_PHRASES : WRONG_PHRASES;
     const text = phrases[Math.floor(Math.random() * phrases.length)];
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.rate = 1.0;
-    utt.volume = 0.8;
-    window.speechSynthesis.speak(utt);
-  }, []);
+
+    if (config.ttsProvider === 'browser') {
+      if (typeof window === 'undefined' || !window.speechSynthesis) return;
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.rate = 1.0;
+      utt.volume = volume;
+      window.speechSynthesis.speak(utt);
+      return;
+    }
+
+    // Use the user's chosen TTS provider (OpenAI / ElevenLabs)
+    fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, provider: config.ttsProvider }),
+    })
+      .then((res) => (res.ok ? res.blob() : null))
+      .then((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.volume = volume;
+        audio.onended = () => URL.revokeObjectURL(url);
+        audio.play().catch(() => {});
+      })
+      .catch(() => {});
+  }, [config.ttsProvider, volume]);
 
   const handleSelect = (idx: number) => {
     if (selected !== null) return;
