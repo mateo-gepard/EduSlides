@@ -606,13 +606,16 @@ export async function POST(req: Request) {
         let lastJsonProbeLen = 0;
         let completedByJsonProbe = false;
 
-        const CHUNK_STALL_MS = 45_000; // Abort if model produces no tokens for 45s
+        const CHUNK_STALL_MS = 30_000;    // No chunk at all for 30s → abort
+        const PROGRESS_STALL_MS = 30_000; // Chunks arrive but text doesn't grow for 30s → abort
 
         const iterator = streamed.textStream[Symbol.asyncIterator]();
         let lastDelta = '';
         let duplicateDeltaCount = 0;
         let duplicateWarned = false;
         let duplicateAccumChars = 0;
+        let lastProgressTime = Date.now();
+        let lastProgressLen = 0;
 
         while (true) {
           // Race each chunk read against a stall timeout so the model can't hang forever
@@ -635,6 +638,22 @@ export async function POST(req: Request) {
           if (next.done) break;
           const delta = typeof next.value === 'string' ? next.value : '';
           text += delta;
+
+          // Track real forward progress (text actually growing)
+          if (text.length > lastProgressLen) {
+            lastProgressLen = text.length;
+            lastProgressTime = Date.now();
+          } else if (Date.now() - lastProgressTime > PROGRESS_STALL_MS) {
+            sendDebug('Model producing empty chunks with no real progress — aborting', {
+              label,
+              textLength: text.length,
+              stalledForMs: Date.now() - lastProgressTime,
+            }, 'warn');
+            if (typeof iterator.return === 'function') {
+              try { await iterator.return(); } catch { /* best-effort */ }
+            }
+            throw new Error(`Model stalled during ${label}: no text growth for ${PROGRESS_STALL_MS / 1000}s at ${text.length} chars`);
+          }
 
           if (options?.endMarker && text.includes(options.endMarker)) {
             const markerIndex = text.indexOf(options.endMarker);

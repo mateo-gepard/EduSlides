@@ -177,9 +177,22 @@ export default function CreatePage() {
       const decoder = new TextDecoder();
       let buffer = '';
       let pendingPresentation: Presentation | null = null;
+      const READ_TIMEOUT_MS = 60_000; // If no data arrives for 60s, assume server died
 
       while (true) {
-        const { done, value } = await reader.read();
+        const readResult = await Promise.race([
+          reader.read(),
+          new Promise<'__timeout__'>((resolve) =>
+            setTimeout(() => resolve('__timeout__'), READ_TIMEOUT_MS)
+          ),
+        ]);
+
+        if (readResult === '__timeout__') {
+          reader.cancel().catch(() => {});
+          throw new Error('Server stopped responding. Please try again.');
+        }
+
+        const { done, value } = readResult;
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
