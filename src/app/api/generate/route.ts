@@ -602,16 +602,36 @@ export async function POST(req: Request) {
         const streamed = streamText(params);
         let text = '';
         let lastEmitLen = 0;
+        let lastEmitTime = 0;
         let lastJsonProbeLen = 0;
         let completedByJsonProbe = false;
+
+        const CHUNK_STALL_MS = 45_000; // Abort if model produces no tokens for 45s
 
         const iterator = streamed.textStream[Symbol.asyncIterator]();
         let lastDelta = '';
         let duplicateDeltaCount = 0;
         let duplicateWarned = false;
+        let duplicateAccumChars = 0;
 
         while (true) {
-          const next = await iterator.next();
+          // Race each chunk read against a stall timeout so the model can't hang forever
+          const next = await Promise.race([
+            iterator.next(),
+            new Promise<'__stall__'>((resolve) => setTimeout(() => resolve('__stall__'), CHUNK_STALL_MS)),
+          ]);
+
+          if (next === '__stall__') {
+            sendDebug('Model stalled: no new tokens for ' + (CHUNK_STALL_MS / 1000) + 's — aborting stream', {
+              label,
+              textLength: text.length,
+            }, 'warn');
+            if (typeof iterator.return === 'function') {
+              try { await iterator.return(); } catch { /* best-effort */ }
+            }
+            throw new Error(`Model stalled during ${label}: no output for ${CHUNK_STALL_MS / 1000}s after ${text.length} chars`);
+          }
+
           if (next.done) break;
           const delta = typeof next.value === 'string' ? next.value : '';
           text += delta;
@@ -665,13 +685,15 @@ export async function POST(req: Request) {
 
           if (delta && delta === lastDelta) {
             duplicateDeltaCount += 1;
+            duplicateAccumChars += delta.length;
           } else {
             duplicateDeltaCount = 0;
+            duplicateAccumChars = 0;
             duplicateWarned = false;
             lastDelta = delta;
           }
 
-          // Keep generation alive; only suppress noisy repeated logs.
+          // Suppress noisy repeated chunks; abort if the model is stuck in a degenerate loop
           if (duplicateDeltaCount >= 12) {
             if (!duplicateWarned) {
               duplicateWarned = true;
@@ -680,12 +702,25 @@ export async function POST(req: Request) {
                 repeatedDeltaSample: delta.slice(0, 120),
               }, 'warn');
             }
+            // If model emitted >4000 chars of pure repetition, it's in a degenerate loop — abort
+            if (duplicateAccumChars > 4000) {
+              sendDebug('Model stuck in repetition loop — aborting', { label, duplicateAccumChars }, 'warn');
+              if (typeof iterator.return === 'function') {
+                try { await iterator.return(); } catch { /* best-effort */ }
+              }
+              throw new Error(`Model stuck in repetition loop during ${label} after ${duplicateAccumChars} duplicate chars`);
+            }
             continue;
           }
 
-          const shouldEmit = text.length - lastEmitLen >= 260 || delta.includes('\n');
+          // Time-based + size-based throttle to prevent SSE flooding
+          const now = Date.now();
+          const timeSinceEmit = now - lastEmitTime;
+          const sizeGrowth = text.length - lastEmitLen;
+          const shouldEmit = sizeGrowth >= 500 || (sizeGrowth >= 80 && timeSinceEmit >= 400);
           if (shouldEmit) {
             lastEmitLen = text.length;
+            lastEmitTime = now;
             sendEvent('model-output', {
               label,
               delta,
@@ -865,8 +900,8 @@ export async function POST(req: Request) {
             provider: designProvider,
             maxOutputTokens: designMaxTokens,
           });
-          // Do not force-terminate long-running design generations.
-          const designTimeoutMs = 0;
+          // Give the design phase a hard timeout to leave room for retries + post-processing
+          const designTimeoutMs = 140_000;
           let designResult: Awaited<ReturnType<typeof generateTextLive>> | null = null;
           let designError: Error | null = null;
 
