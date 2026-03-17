@@ -179,6 +179,24 @@
     padding: 6% 8%;
   }
 
+  /* Responsive slide scaling for mobile — reduce padding so content has more room */
+  @media (max-width: 768px) {
+    .slide-inner {
+      padding: 4% 5%;
+    }
+  }
+
+  /* ─── Slide content responsive scaling ─── */
+  /* Scale down text and spacing inside slides rendered on small viewports */
+  @media (max-width: 640px) {
+    .slide-frame {
+      border-radius: 0;
+    }
+    .slide-inner {
+      padding: 3% 4%;
+    }
+  }
+
   /* Progress bar */
   .progress-track {
     height: 3px;
@@ -238,6 +256,19 @@
       0 0 0 1px rgba(255, 255, 255, 0.04),
       0 20px 60px -12px rgba(0, 0, 0, 0.5),
       0 0 120px -40px rgba(99, 102, 241, 0.08);
+  }
+
+  /* On mobile portrait: pin slide to top, drop border-radius, maximize width */
+  @media (max-width: 768px) and (orientation: portrait) {
+    .player-viewport {
+      max-width: 100vw;
+      max-height: 56.25vw;
+      align-self: flex-start;
+    }
+    .player-bezel {
+      border-radius: 0;
+      box-shadow: none;
+    }
   }
 
   .player-subtitle {
@@ -396,6 +427,32 @@
       width: 96px;
       opacity: 1;
     }
+    .player-progress-thumb {
+      opacity: 1;
+      width: 14px;
+      height: 14px;
+    }
+    .player-progress-track {
+      height: 6px;
+    }
+  }
+
+  /* Small phone in portrait: tighter subtitle placement */
+  @media (max-width: 640px) {
+    .player-subtitle {
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 8px 14px;
+      border-radius: 8px;
+      max-width: 92vw;
+    }
+    .player-topbar {
+      padding: calc(6px + env(safe-area-inset-top)) 10px 6px;
+    }
+    .player-btn-ghost {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
   }
 
   /* Button base */
@@ -505,6 +562,16 @@
     cursor: pointer;
     transition: all 0.2s ease;
     font-size: 17px;
+  }
+
+  /* ─── Responsive slide padding utility ─── */
+  .slide-pad {
+    padding: 5% 6%;
+  }
+  @media (min-width: 640px) {
+    .slide-pad {
+      padding: 40px;
+    }
   }
   .quiz-option:hover {
     background: rgba(255, 255, 255, 0.06);

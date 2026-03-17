@@ -171,33 +171,41 @@ function normalizeSlideHeading(slide: Record<string, unknown>): string {
 
 async function fetchBingImageCandidates(query: string): Promise<string[]> {
   if (!query.trim()) return [];
-  try {
-    const searchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&first=1&qft=+filterui:photo-photo+filterui:imagesize-large`;
-    const res = await fetch(searchUrl, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!res.ok) return [];
 
-    const html = await res.text();
-    const urls: string[] = [];
-    for (const m of html.matchAll(/"murl"\s*:\s*"(https?:\/\/[^\"]+)"/g)) {
-      urls.push(m[1]);
-    }
-    for (const m of html.matchAll(/murl&quot;:&quot;(https?:\/\/[^&\"]+)/g)) {
-      urls.push(m[1]);
-    }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const searchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&first=1&qft=+filterui:photo-photo+filterui:imagesize-large`;
+      const res = await fetch(searchUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!res.ok) { if (attempt < 2) { await new Promise(r => setTimeout(r, 500 * (attempt + 1))); continue; } return []; }
 
-    const unique = Array.from(new Set(urls.filter((u) => isLikelyPhotoUrl(u))));
-    return unique.slice(0, 6);
-  } catch {
-    return [];
+      const html = await res.text();
+      const urls: string[] = [];
+      for (const m of html.matchAll(/"murl"\s*:\s*"(https?:\/\/[^\"]+)"/g)) {
+        urls.push(m[1]);
+      }
+      for (const m of html.matchAll(/murl&quot;:&quot;(https?:\/\/[^&\"]+)/g)) {
+        urls.push(m[1]);
+      }
+
+      const unique = Array.from(new Set(urls.filter((u) => isLikelyPhotoUrl(u))));
+      if (unique.length > 0) return unique.slice(0, 6);
+      // No results — retry with simplified query
+      if (attempt < 2) { await new Promise(r => setTimeout(r, 500 * (attempt + 1))); continue; }
+      return [];
+    } catch {
+      if (attempt < 2) { await new Promise(r => setTimeout(r, 500 * (attempt + 1))); continue; }
+      return [];
+    }
   }
+  return [];
 }
 
 export async function POST(req: Request) {

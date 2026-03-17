@@ -238,7 +238,7 @@ export default function DiagramSlide({ content }: { content: DiagramContent }) {
   const Layout = layoutMap[content.layout] || ScatterLayout;
 
   return (
-    <div className="flex h-full px-8 py-8 gap-6 overflow-hidden">
+    <div className="flex h-full slide-pad gap-3 sm:gap-6 overflow-hidden">
       {/* Diagram area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <motion.div
@@ -263,7 +263,7 @@ export default function DiagramSlide({ content }: { content: DiagramContent }) {
           initial={{ opacity: 0, x: 30 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.6, duration: 0.5 }}
-          className="w-72 shrink-0 flex flex-col gap-2.5 overflow-y-auto py-2"
+          className="hidden sm:flex w-72 shrink-0 flex-col gap-2.5 overflow-y-auto py-2"
         >
           {content.infoList.map((item, i) => (
             <motion.div

@@ -79,6 +79,7 @@ export default function PlayerPage() {
   const slides = presentation?.slides || [];
   const slide = slides[currentIndex];
   const totalSlides = slides.length;
+  const isQuizSlide = slide?.type === 'quiz' || (slide?.content as unknown as Record<string, unknown>)?.type === 'quiz';
   const currentAudioUrl = slide ? audioMap[slide.id] : undefined;
   const effectiveSlideDuration = Math.max(slide?.duration || 0, audioMinDuration);
 
@@ -162,14 +163,14 @@ export default function PlayerPage() {
     setSubtitle(current);
   }, [elapsed, slide, showSubtitles, currentAudioUrl]);
 
-  /* ─── Auto-advance ─── */
+  /* ─── Auto-advance (skip for quiz slides — user controls pace) ─── */
   useEffect(() => {
-    if (!isPlaying || !slide) return;
+    if (!isPlaying || !slide || isQuizSlide) return;
     if (elapsed >= effectiveSlideDuration) {
       if (currentIndex < totalSlides - 1) next();
       else setIsPlaying(false);
     }
-  }, [elapsed, isPlaying, effectiveSlideDuration, currentIndex, totalSlides, slide, next, setIsPlaying]);
+  }, [elapsed, isPlaying, effectiveSlideDuration, currentIndex, totalSlides, slide, next, setIsPlaying, isQuizSlide]);
 
   /* ─── Audio / TTS playback ─── */
   const stopAudio = useCallback(() => {
@@ -258,6 +259,10 @@ export default function PlayerPage() {
   useEffect(() => {
     stopAudio();
     if (!slide || !isPlaying) return;
+
+    // Skip TTS for quiz slides — the narration would reveal answers before the user picks
+    const slideType = slide.type || (slide.content as unknown as Record<string, unknown>)?.type;
+    if (slideType === 'quiz') return;
 
     const targetIndex = currentIndex;
     const scheduleDelayedPlay = (audio: HTMLAudioElement) => {
@@ -390,6 +395,26 @@ export default function PlayerPage() {
 
   useEffect(() => { if (!isPlaying) setShowControls(true); }, [isPlaying]);
 
+  /* ─── Touch swipe for mobile slide navigation ─── */
+  const touchStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, t: Date.now() };
+  }, []);
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    const dt = Date.now() - touchStartRef.current.t;
+    touchStartRef.current = null;
+    // Require horizontal swipe: >60px, faster than 400ms, more horizontal than vertical
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 400) {
+      if (dx < 0) next();
+      else prev();
+    }
+  }, [next, prev]);
+
   if (!presentation || !slide) return null;
 
   const trans = slide.transition || 'fade';
@@ -399,12 +424,15 @@ export default function PlayerPage() {
     <div
       className="player-shell"
       onMouseMove={showControlsTemporarily}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onClick={showControlsTemporarily}
     >
       {/* ═══ Ambient glow behind the slide ═══ */}
       <div className="player-ambient" />
 
       {/* ═══ Slide viewport ═══ */}
-      <div className="absolute inset-0 flex items-center justify-center z-[1]">
+      <div className="absolute inset-0 flex items-start sm:items-center justify-center z-[1]">
         <div className="player-viewport">
           {/* Subtle rounded bezel */}
           <div className="player-bezel">
@@ -423,24 +451,18 @@ export default function PlayerPage() {
                   accentColor={presentation.metadata.accentColor || '#818cf8'}
                   opacity={0.6}
                 />
-                {/* Ken Burns camera motion wrapper */}
-                <motion.div
-                  className="absolute inset-0"
-                  initial={{ scale: 1.0 }}
-                  animate={{ scale: 1.06 }}
-                  transition={{ duration: effectiveSlideDuration || 8, ease: 'linear' }}
-                  key={`kb-${slide.id}`}
-                >
+                {/* Slide content */}
+                <div className="absolute inset-0">
                   <SlideRenderer slide={slide} />
-                </motion.div>
+                </div>
               </motion.div>
             </AnimatePresence>
           </div>
 
-          {/* Edge navigation zones (click left/right thirds) */}
+          {/* Edge navigation zones (click/tap left/right) */}
           <div className="absolute inset-y-0 left-0 w-1/4 z-10 cursor-pointer group"
             onClick={() => prev()}>
-            <div className="absolute inset-y-0 left-2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="absolute inset-y-0 left-2 flex items-center opacity-0 group-hover:opacity-100 sm:group-active:opacity-100 transition-opacity duration-200">
               <div className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
                 <ChevronLeft className="w-5 h-5 text-white/80" />
               </div>
@@ -448,7 +470,7 @@ export default function PlayerPage() {
           </div>
           <div className="absolute inset-y-0 right-0 w-1/4 z-10 cursor-pointer group"
             onClick={() => next()}>
-            <div className="absolute inset-y-0 right-2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="absolute inset-y-0 right-2 flex items-center opacity-0 group-hover:opacity-100 sm:group-active:opacity-100 transition-opacity duration-200">
               <div className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
                 <ChevronRight className="w-5 h-5 text-white/80" />
               </div>
@@ -465,7 +487,7 @@ export default function PlayerPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.2 }}
-            className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 max-w-2xl px-4"
+            className="absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 z-30 w-full max-w-2xl px-3 sm:px-4"
           >
             <p className="player-subtitle text-center mx-auto">{subtitle}</p>
           </motion.div>
@@ -488,8 +510,8 @@ export default function PlayerPage() {
             <span className="hidden sm:inline">Exit</span>
           </button>
 
-          <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/[0.06]">
-            <span className="text-[13px] text-white/70 font-medium truncate max-w-[300px]">
+          <div className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-lg bg-white/[0.06] min-w-0 flex-1 mx-2 sm:mx-4 max-w-[50vw] sm:max-w-[300px]">
+            <span className="text-[11px] sm:text-[13px] text-white/70 font-medium truncate">
               {presentation.metadata.title}
             </span>
           </div>
@@ -563,8 +585,8 @@ export default function PlayerPage() {
 
             <div className="flex-1" />
 
-            {/* Volume group */}
-            <div className="hidden sm:flex items-center gap-1.5 group/vol">
+            {/* Volume group — visible on all devices */}
+            <div className="flex items-center gap-1 sm:gap-1.5 group/vol">
               <button onClick={() => setVolume(volume > 0 ? 0 : 0.8)} className="player-btn-icon">
                 {volume > 0 ? <Volume2 className="w-[18px] h-[18px]" /> : <VolumeX className="w-[18px] h-[18px]" />}
               </button>
@@ -595,9 +617,9 @@ export default function PlayerPage() {
       <motion.div
         initial={false}
         animate={{ opacity: showControls ? 1 : 0 }}
-        className="absolute bottom-[72px] left-1/2 -translate-x-1/2 z-20 pointer-events-auto"
+        className="absolute bottom-[60px] sm:bottom-[72px] left-1/2 -translate-x-1/2 z-20 pointer-events-auto max-w-[90vw] overflow-x-auto"
       >
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 px-2">
           {slides.map((_, i) => (
             <button
               key={i}

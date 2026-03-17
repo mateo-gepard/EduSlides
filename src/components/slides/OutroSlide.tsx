@@ -6,7 +6,7 @@ import type { OutroContent } from '@/lib/types';
 
 export default function OutroSlide({ content }: { content: OutroContent }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-12 text-center relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center h-full px-6 sm:px-12 text-center relative overflow-hidden">
       {/* Decorative soft glow */}
       <div className="absolute w-[400px] h-[400px] rounded-full bg-indigo-100/50 blur-[100px] pointer-events-none" />
 

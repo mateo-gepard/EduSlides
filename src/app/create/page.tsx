@@ -444,7 +444,7 @@ export default function CreatePage() {
       <div className="mesh-bg" />
 
       {/* ─── Nav ─── */}
-      <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-7xl mx-auto border-b border-white/[0.04]">
+      <nav className="relative z-10 flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 max-w-7xl mx-auto border-b border-white/[0.04]">
         <button
           onClick={() => router.push('/')}
           className="flex items-center gap-3 hover:opacity-80 transition-opacity"
@@ -470,7 +470,7 @@ export default function CreatePage() {
       </nav>
 
       {/* ─── Main ─── */}
-      <main className="relative z-10 max-w-3xl mx-auto px-6 pb-24">
+      <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 pb-24">
         <motion.div initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.08 } } }}>
           {/* Header */}
           <motion.div variants={fadeUp} className="mb-10 pt-4">
@@ -478,8 +478,8 @@ export default function CreatePage() {
               <Sparkles className="w-3 h-3" />
               AI Generation Pipeline
             </div>
-            <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight">Create Presentation</h1>
-            <p className="text-lg text-slate-400">Describe a topic or upload a PDF. Two AI models do the rest.</p>
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white mb-3 tracking-tight">Create Presentation</h1>
+            <p className="text-base sm:text-lg text-slate-400">Describe a topic or upload a PDF. Two AI models do the rest.</p>
           </motion.div>
 
           {/* ─── Topic Input ─── */}
@@ -496,7 +496,7 @@ export default function CreatePage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="label">Subject (optional)</label>
                 <input
@@ -526,7 +526,7 @@ export default function CreatePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="label">Depth</label>
                 <div className="relative">
@@ -653,13 +653,13 @@ export default function CreatePage() {
                       <label className="label flex items-center gap-1.5">
                         <BrainCircuit className="w-3.5 h-3.5" /> Script Writer
                       </label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                         {SCRIPT_PROVIDERS.map((p) => (
                           <button
                             key={p.value}
                             onClick={() => store.setConfig({ scriptProvider: p.value as 'gemini' | 'anthropic' | 'openai' })}
                             disabled={isGenerating}
-                            className={`p-3 rounded-xl text-left transition-all border ${
+                            className={`p-2 sm:p-3 rounded-xl text-left transition-all border ${
                               config.scriptProvider === p.value
                                 ? 'border-indigo-500/50 bg-indigo-500/10'
                                 : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04]'
@@ -679,13 +679,13 @@ export default function CreatePage() {
                       <label className="label flex items-center gap-1.5">
                         <Palette className="w-3.5 h-3.5" /> Design Compiler
                       </label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                         {DESIGN_PROVIDERS.map((p) => (
                           <button
                             key={p.value}
                             onClick={() => store.setConfig({ designProvider: p.value as 'anthropic' | 'anthropic-haiku' | 'openai' })}
                             disabled={isGenerating}
-                            className={`p-3 rounded-xl text-left transition-all border ${
+                            className={`p-2 sm:p-3 rounded-xl text-left transition-all border ${
                               config.designProvider === p.value
                                 ? 'border-violet-500/50 bg-violet-500/10'
                                 : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04]'
@@ -705,13 +705,13 @@ export default function CreatePage() {
                       <label className="label flex items-center gap-1.5">
                         <Volume2 className="w-3.5 h-3.5" /> Voice Provider
                       </label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                         {TTS_PROVIDERS.map((p) => (
                           <button
                             key={p.value}
                             onClick={() => store.setConfig({ ttsProvider: p.value as 'openai' | 'elevenlabs' | 'browser' })}
                             disabled={isGenerating}
-                            className={`p-3 rounded-xl text-left transition-all border ${
+                            className={`p-2 sm:p-3 rounded-xl text-left transition-all border ${
                               config.ttsProvider === p.value
                                 ? 'border-emerald-500/50 bg-emerald-500/10'
                                 : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04]'

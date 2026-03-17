@@ -9,15 +9,15 @@ export default function SummarySlide({ content }: { content: SummaryContent }) {
   const cols = items.length <= 4 ? 2 : 3;
 
   return (
-    <div className="flex flex-col h-full px-10 py-10 overflow-hidden">
+    <div className="flex flex-col h-full slide-pad overflow-hidden">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6 text-center shrink-0">
         <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">{content.chapter}</span>
         <h2 className="text-2xl font-bold text-slate-800 mt-1">{content.heading}</h2>
       </motion.div>
 
       <div
-        className="grid gap-4 flex-1 auto-rows-fr min-h-0"
-        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+        className="grid gap-2 sm:gap-4 flex-1 auto-rows-fr min-h-0"
+        style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(140px, 100%), 1fr))` }}
       >
         {items.map((item, i) => (
           <motion.div

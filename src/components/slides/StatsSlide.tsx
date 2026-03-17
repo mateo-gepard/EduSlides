@@ -41,7 +41,7 @@ export default function StatsSlide({ content }: { content: StatsContent }) {
   const cols = items.length <= 2 ? 2 : items.length <= 4 ? 2 : 3;
 
   return (
-    <div className="flex flex-col h-full px-10 py-10 overflow-hidden">
+    <div className="flex flex-col h-full slide-pad overflow-hidden">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6 shrink-0">
         <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">
           {content.chapter}
@@ -50,8 +50,8 @@ export default function StatsSlide({ content }: { content: StatsContent }) {
       </motion.div>
 
       <div
-        className="grid gap-5 flex-1 auto-rows-fr min-h-0"
-        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+        className="grid gap-3 sm:gap-5 flex-1 auto-rows-fr min-h-0"
+        style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(120px, 100%), 1fr))` }}
       >
         {items.map((item, i) => (
           <motion.div

@@ -2,10 +2,11 @@
 
 import { motion } from 'framer-motion';
 import type { BigStatementContent } from '@/lib/types';
+import FitText from '../FitText';
 
 export default function BigStatementSlide({ content }: { content: BigStatementContent }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-12 relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center h-full px-6 sm:px-12 relative overflow-hidden">
       {/* Soft glow backdrop */}
       <div
         className="absolute w-[500px] h-[500px] rounded-full opacity-10 blur-[120px] pointer-events-none"
@@ -27,9 +28,11 @@ export default function BigStatementSlide({ content }: { content: BigStatementCo
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="text-4xl sm:text-5xl lg:text-6xl font-black text-center text-slate-800 leading-tight max-w-4xl"
+        className="max-w-4xl w-full"
       >
-        {content.statement}
+        <FitText text={content.statement} min={20} max={56} className="font-black text-center text-slate-800 leading-tight">
+          {content.statement}
+        </FitText>
       </motion.div>
 
       {/* Description */}

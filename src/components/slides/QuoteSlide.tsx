@@ -2,10 +2,11 @@
 
 import { motion } from 'framer-motion';
 import type { QuoteContent } from '@/lib/types';
+import FitText from '../FitText';
 
 export default function QuoteSlide({ content }: { content: QuoteContent }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-10 relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center h-full px-5 sm:px-10 relative overflow-hidden">
       {/* Accent glow */}
       <div
         className="absolute w-[600px] h-[600px] rounded-full opacity-[0.08] blur-[140px] pointer-events-none"
@@ -34,14 +35,16 @@ export default function QuoteSlide({ content }: { content: QuoteContent }) {
       </motion.div>
 
       {/* Quote text */}
-      <motion.blockquote
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-slate-800 text-center leading-snug max-w-4xl -mt-10"
+        className="max-w-4xl w-full -mt-10"
       >
-        {content.quote}
-      </motion.blockquote>
+        <FitText text={content.quote} min={18} max={44} className="font-semibold text-slate-800 text-center leading-snug">
+          {content.quote}
+        </FitText>
+      </motion.div>
 
       {/* Attribution */}
       <motion.div

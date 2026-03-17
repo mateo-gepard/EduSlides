@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import 'katex/dist/katex.min.css';
 import './globals.css';
@@ -8,6 +8,13 @@ const inter = Inter({
   variable: '--font-inter',
   display: 'swap',
 });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: 'EduSlides — AI-Powered Interactive Learning',

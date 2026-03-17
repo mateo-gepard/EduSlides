@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import { MotionConfig } from 'framer-motion';
 import type { Slide, SlideContent } from '@/lib/types';
 
 /* Dynamic imports to keep bundle splitting sane */
@@ -68,7 +69,11 @@ export default function SlideRenderer({ slide }: { slide: Slide }) {
 
   /* image-spotlight gets special treatment — no overlay, image is the slide */
   if (type === 'image-spotlight') {
-    return <ImageSpotlightWrapper content={content} imageUrl={slide.imageUrl} />;
+    return (
+      <MotionConfig transition={{ type: 'tween', duration: 0.45, ease: 'easeOut' }}>
+        <ImageSpotlightWrapper content={content} imageUrl={slide.imageUrl} />
+      </MotionConfig>
+    );
   }
 
   const Renderer = renderers[type];
@@ -82,10 +87,10 @@ export default function SlideRenderer({ slide }: { slide: Slide }) {
   }
 
   return (
-    <>
+    <MotionConfig transition={{ type: 'tween', duration: 0.45, ease: 'easeOut' }}>
       <Renderer content={content} />
       {slide.imageUrl && <SlideImage url={slide.imageUrl} />}
-    </>
+    </MotionConfig>
   );
 }
 

@@ -7,24 +7,24 @@ export default function ProcessSlide({ content }: { content: ProcessContent }) {
   const steps = content.steps || [];
 
   return (
-    <div className="flex flex-col h-full px-10 py-10 overflow-hidden">
+    <div className="flex flex-col h-full slide-pad overflow-hidden">
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-4 shrink-0"
+        className="mb-3 sm:mb-4 shrink-0"
       >
-        <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">
+        <span className="text-[10px] sm:text-xs font-semibold tracking-widest uppercase text-slate-400">
           {content.chapter}
         </span>
-        <h2 className="text-2xl font-bold text-slate-800 mt-1">{content.heading}</h2>
+        <h2 className="text-lg sm:text-2xl font-bold text-slate-800 mt-1">{content.heading}</h2>
         {content.description && (
-          <p className="text-sm text-slate-500 mt-2 max-w-xl">{content.description}</p>
+          <p className="text-[11px] sm:text-sm text-slate-500 mt-1 sm:mt-2 max-w-xl">{content.description}</p>
         )}
       </motion.div>
 
       <div className="flex-1 flex items-center min-h-0">
-        <div className="grid gap-4 w-full" style={{
-          gridTemplateColumns: `repeat(${Math.min(steps.length, 5)}, 1fr)`,
+        <div className="grid gap-2 sm:gap-4 w-full" style={{
+          gridTemplateColumns: `repeat(auto-fit, minmax(min(100px, 100%), 1fr))`,
         }}>
           {steps.map((step, i) => (
             <motion.div

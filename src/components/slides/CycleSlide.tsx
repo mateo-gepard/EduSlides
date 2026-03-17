@@ -16,7 +16,7 @@ export default function CycleSlide({ content }: { content: CycleContent }) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-10 py-10 overflow-hidden">
+    <div className="flex flex-col items-center justify-center h-full slide-pad overflow-hidden">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center mb-6 shrink-0">
         <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">
           {content.chapter}

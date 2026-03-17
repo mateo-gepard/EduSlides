@@ -1,8 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { QuizContent } from '@/lib/types';
+
+const CORRECT_PHRASES = [
+  "That's correct! Nice work.",
+  "Exactly right! Well done.",
+  "Correct! You nailed it.",
+  "Spot on! Great thinking.",
+];
+const WRONG_PHRASES = [
+  "Not quite, but good thought!",
+  "Close, but not this time. Keep going!",
+  "Wrong answer, but great effort!",
+  "That's not it, but you're learning!",
+];
 
 export default function QuizSlide({ content }: { content: QuizContent }) {
   const questions = content.questions || [];
@@ -13,10 +26,22 @@ export default function QuizSlide({ content }: { content: QuizContent }) {
 
   const q = questions[current];
 
+  const speakFeedback = useCallback((correct: boolean) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const phrases = correct ? CORRECT_PHRASES : WRONG_PHRASES;
+    const text = phrases[Math.floor(Math.random() * phrases.length)];
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = 1.0;
+    utt.volume = 0.8;
+    window.speechSynthesis.speak(utt);
+  }, []);
+
   const handleSelect = (idx: number) => {
     if (selected !== null) return;
     setSelected(idx);
-    if (idx === q.correctIndex) setScore((s) => s + 1);
+    const correct = idx === q.correctIndex;
+    if (correct) setScore((s) => s + 1);
+    speakFeedback(correct);
   };
 
   const handleNext = () => {
@@ -31,7 +56,7 @@ export default function QuizSlide({ content }: { content: QuizContent }) {
   if (!q) return null;
 
   return (
-    <div className="flex flex-col h-full px-10 py-10 overflow-hidden">
+    <div className="flex flex-col h-full slide-pad overflow-hidden">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4 shrink-0">
         <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">{content.chapter}</span>
         <h2 className="text-2xl font-bold text-slate-800 mt-1">{content.heading}</h2>

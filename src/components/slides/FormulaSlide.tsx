@@ -27,7 +27,7 @@ export default function FormulaSlide({ content }: { content: FormulaContent }) {
   const steps = content.steps || [];
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-8 relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center h-full px-4 sm:px-8 relative overflow-hidden">
       {/* Glow */}
       <div
         className="absolute w-[500px] h-[500px] rounded-full opacity-10 blur-[120px] pointer-events-none"
@@ -49,7 +49,7 @@ export default function FormulaSlide({ content }: { content: FormulaContent }) {
         initial={{ opacity: 0, scale: 0.85 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-sm border border-slate-200 px-10 py-8 mb-6"
+        className="bg-white/60 backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 px-4 py-4 sm:px-10 sm:py-8 mb-4 sm:mb-6"
       >
         <KaTeX math={content.formula} display className="text-3xl sm:text-4xl lg:text-5xl text-slate-800" />
       </motion.div>

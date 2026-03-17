@@ -35,9 +35,9 @@ export default function InfographicSlide({ content }: { content: InfographicCont
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ delay: 0.3 + i * 0.15, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className={`flex ${
-              isHorizontal ? 'flex-col items-center text-center' : 'flex-row items-center gap-5'
-            } bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200 shadow-sm p-5 ${
-              isHorizontal ? 'min-w-[180px] max-w-[220px]' : 'w-full max-w-2xl'
+              isHorizontal ? 'flex-col items-center text-center' : 'flex-row items-center gap-3 sm:gap-5'
+            } bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200 shadow-sm p-3 sm:p-5 ${
+              isHorizontal ? 'min-w-[120px] sm:min-w-[180px] max-w-[180px] sm:max-w-[220px]' : 'w-full max-w-2xl'
             }`}
           >
             {/* Icon + Value */}

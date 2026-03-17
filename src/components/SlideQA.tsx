@@ -82,7 +82,7 @@ export default function SlideQA({ slide, presentationTitle, language }: SlideQAP
       {/* Toggle button */}
       <motion.button
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-[88px] right-4 z-40 w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 backdrop-blur-md border border-white/10 text-white/60 hover:text-white shadow-lg flex items-center justify-center transition-colors"
+        className="fixed bottom-[88px] right-3 sm:right-4 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/15 backdrop-blur-md border border-white/10 text-white/60 hover:text-white shadow-lg flex items-center justify-center transition-colors"
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
         title="Ask a question about this slide"
@@ -98,7 +98,7 @@ export default function SlideQA({ slide, presentationTitle, language }: SlideQAP
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-[136px] right-4 z-40 w-80 max-h-[380px] rounded-xl bg-[#0f1629]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden"
+            className="fixed bottom-[120px] sm:bottom-[136px] right-2 sm:right-4 z-40 w-[calc(100vw-16px)] sm:w-80 max-h-[50vh] sm:max-h-[380px] rounded-xl bg-[#0f1629]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden"
           >
             {/* Header */}
             <div className="px-4 py-3 border-b border-white/[0.06] bg-white/[0.02]">

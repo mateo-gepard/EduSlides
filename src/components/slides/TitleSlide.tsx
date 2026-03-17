@@ -2,11 +2,12 @@
 
 import { motion } from 'framer-motion';
 import SlideIcon from '../SlideIcon';
+import FitText from '../FitText';
 import type { TitleContent } from '@/lib/types';
 
 export default function TitleSlide({ content }: { content: TitleContent }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-12 relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center h-full text-center px-6 sm:px-12 relative overflow-hidden">
       {/* Decorative rings */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-[600px] h-[600px] rounded-full border border-slate-200/50 absolute" />
@@ -25,14 +26,16 @@ export default function TitleSlide({ content }: { content: TitleContent }) {
       </motion.div>
 
       {/* Title */}
-      <motion.h1
+      <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ delay: 0.4, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight text-slate-800 leading-[1.08] max-w-4xl"
+        className="max-w-4xl w-full"
       >
-        {content.title}
-      </motion.h1>
+        <FitText text={content.title} min={24} max={64} className="font-black tracking-tight text-slate-800 leading-[1.08] text-center">
+          {content.title}
+        </FitText>
+      </motion.div>
 
       {/* Subtitle */}
       <motion.p

@@ -3,10 +3,11 @@
 import { motion } from 'framer-motion';
 import type { FunFactContent } from '@/lib/types';
 import SlideIcon from '../SlideIcon';
+import FitText from '../FitText';
 
 export default function FunFactSlide({ content }: { content: FunFactContent }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-10 relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center h-full px-5 sm:px-10 relative overflow-hidden">
       {/* Big glow */}
       <div
         className="absolute w-[600px] h-[600px] rounded-full opacity-[0.08] blur-[140px] pointer-events-none"
@@ -27,7 +28,7 @@ export default function FunFactSlide({ content }: { content: FunFactContent }) {
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+        transition={{ delay: 0.3 }}
         className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6 shadow-sm"
         style={{ background: `${content.accent}15` }}
       >
@@ -50,11 +51,11 @@ export default function FunFactSlide({ content }: { content: FunFactContent }) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="bg-white/60 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm px-8 py-6 max-w-3xl text-center"
+        className="bg-white/60 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm px-4 py-4 sm:px-8 sm:py-6 max-w-3xl text-center"
       >
-        <p className="text-xl sm:text-2xl font-semibold text-slate-800 leading-snug">
+        <FitText text={content.fact} min={16} max={32} className="font-semibold text-slate-800 leading-snug">
           {content.fact}
-        </p>
+        </FitText>
       </motion.div>
 
       {/* Explanation */}

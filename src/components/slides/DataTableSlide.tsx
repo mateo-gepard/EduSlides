@@ -13,7 +13,7 @@ const badgeColors: Record<string, { bg: string; text: string; border: string }> 
 
 export default function DataTableSlide({ content }: { content: DataTableContent }) {
   return (
-    <div className="flex h-full px-8 py-8 gap-6 overflow-hidden">
+    <div className="flex h-full slide-pad gap-3 sm:gap-6 overflow-hidden">
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4 shrink-0">
           <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">

@@ -34,7 +34,7 @@ Your output format:
     {
       "heading": "Section heading",
       "keyPoints": ["Key fact 1", "Key fact 2", "Key fact 3"],
-      "narration": "Full spoken narration for this section. Write naturally, as if you're an expert teacher speaking to engaged students. MINIMUM 4-8 sentences per section — explain concepts thoroughly, give real-world analogies, pause for emphasis, connect ideas to prior sections. Do NOT just state facts — teach them. Be conversational but precise. NEVER use emoji anywhere.",
+      "narration": "Full spoken narration for this section. Write naturally, as if you're an expert teacher speaking to engaged students. MINIMUM 4-8 sentences per section — explain concepts thoroughly, give real-world analogies, pause for emphasis, connect ideas to prior sections. Do NOT just state facts — teach them. Be conversational but precise. NEVER use emoji anywhere. CRITICAL: Start by connecting to the previous section and end by bridging to the next one. The narration should feel like one continuous story, not isolated paragraphs.",
       "suggestedVisual": "<one of the 25 types listed below>",
       "particleTheme": "bokeh|geometric|stars|organic|none",
       "transition": "fade|slide|zoom|scale|wipe|blur|flip",
@@ -54,22 +54,40 @@ Your output format:
   "sources": ["Full APA-style citation 1", "Full APA-style citation 2", "..."]
 }
 
-═══ STORYTELLING & ENGAGEMENT ═══
+═══ STORYTELLING & ENGAGEMENT — CRITICAL ═══
 
-You MUST craft the script like a story, not a lecture. Use these techniques:
+You MUST craft the script like a CONTINUOUS STORY, not a series of disconnected slides.
+The #1 complaint is presentations that feel like "snippets glued together." Fix that.
 
-1. HOOK: Start with a surprising fact, a provocative question, or a vivid scenario. The first section's narration must grab attention within 5 seconds.
+GOLDEN RULE: Every section MUST logically follow from the previous one. The viewer should feel a PULL to keep watching because each section raises a question that the next section answers.
 
-2. NARRATIVE ARC: Choose one that fits the topic:
+1. HOOK: Start with a surprising fact, a provocative question, or a vivid scenario. The first section's narration must grab attention within 5 seconds. Plant a central question or mystery that the entire presentation will answer.
+
+2. NARRATIVE ARC: Choose one and COMMIT to it for the whole presentation:
    - "brief": Simple → Complex (default for short presentations)
    - "build-reveal": Slowly build mystery, then reveal the answer
    - "mystery": Open with a puzzle, each section reveals a clue
    - "journey": Take the viewer on a chronological or conceptual journey
    - "debate": Present two sides, weigh evidence, arrive at a conclusion
 
-3. CURIOSITY GAPS: Before explaining something, make the viewer WANT to know. "But here's where it gets weird..." / "This raises an obvious question..." / "What nobody expected was..."
+3. THROUGHLINE: Establish a CENTRAL QUESTION or PROMISE in the hook that threads through the entire presentation. Every section should visibly contribute to answering that question. Examples:
+   - "How did a single bacterium almost end humanity?" (then each section is a chapter in that story)
+   - "What if everything you know about X is wrong?" (then each section dismantles a misconception)
+   - "Three discoveries changed physics forever." (then the presentation builds toward the most important)
 
-4. EMOTIONAL BEATS: Tag each section with an emotionalBeat:
+4. CONTINUITY BETWEEN SECTIONS: This is NON-NEGOTIABLE. Every section's narration must:
+   - START by connecting to what was just said ("Now that we understand X, let's see what happens when...")
+   - END with a bridge to the next section ("But this raises an even bigger question..." / "And this is where things get really interesting...")
+   - Each section should feel like a chapter in a book, not a standalone Wikipedia article
+   - Use callbacks to earlier sections ("Remember the hook from the beginning? Here's the payoff...")
+
+5. PROGRESSIVE REVELATION: Don't dump all information at once. Build understanding layer by layer:
+   - Section 2 builds on concepts from Section 1
+   - Section 3 adds complexity or a twist
+   - The climax section reveals the biggest insight
+   - The summary ties everything back to the opening hook
+
+6. EMOTIONAL BEATS: Tag each section with an emotionalBeat:
    - "hook": Opening surprise
    - "build": Building understanding
    - "reveal": A-ha moment / key insight
@@ -78,9 +96,11 @@ You MUST craft the script like a story, not a lecture. Use these techniques:
    - "reflect": Looking back / broader meaning
    - "resolve": Wrapping up / call to action
 
-5. TRANSITIONS BETWEEN SECTIONS: End each section's narration with a bridge to the next. "But that's only half the story..." / "Which leads us to an even bigger question..."
+7. CURIOSITY GAPS: Before explaining something, make the viewer WANT to know. "But here's where it gets weird..." / "This raises an obvious question..." / "What nobody expected was..."
 
-6. VISUAL PACING: Alternate between dense information slides and breathing-room slides. After a complex diagram, follow with a big-statement or quote to let it sink in.
+8. PACING: Alternate between dense information slides and breathing-room slides. After a complex diagram, follow with a big-statement or quote to let it sink in.
+
+9. NARRATION STYLE: Write narration as if telling a story to a friend who's curious but not an expert. Use "we" and "our" to include the viewer. Avoid dry academic tone. Never just list facts — always explain WHY something matters and HOW it connects to the bigger picture.
 
 ═══ VISUAL MODULE SELECTION — STORYBOARD ═══
 
@@ -248,6 +268,7 @@ NARRATION RULES:
 - DURATION GUIDE: title = 8-10s, content slides = 15-25s, quiz = 20-25s, summary = 12-18s, outro = 8-10s.
 - NEVER set duration to 60 seconds. Most slides should be 15-25 seconds. Total of all durations must roughly match target minutes × 60.
 - IMPORTANT: Keep total JSON output compact. Do NOT over-elaborate narration text.
+- QUIZ SLIDE NARRATION: For quiz slides, narration must ONLY introduce the question and encourage the viewer to think. NEVER reveal the correct answer, the explanation, or any hint about which option is right. Example: "Time to test your understanding. Look at these options carefully and pick the one you think is correct." The quiz is interactive — the user chooses their answer.
 
 ═══════════════════════════════════════
 ALL 25 SLIDE TYPES — EXACT JSON SCHEMAS
@@ -485,6 +506,7 @@ RULES:
 - First=title, last=outro, before-last=summary. Max 8 slides.
 - LIGHT backgrounds only. NO dark colors. NO emoji.
 - Keep narration SHORT: max 2 cues per slide, each 1 sentence.
+- QUIZ NARRATION: Only introduce the question, NEVER reveal the answer or hint at the correct option.
 - All content from the script. Do not hallucinate.
 - Icon names: atom, brain, heart, book, globe, chart, lightbulb, check, sparkles, calculator, clock, eye, shield, star, award`;
 }
@@ -591,7 +613,9 @@ GRAPH CONVENTIONS:
 
 RULES: First=title, last=outro, 10+ distinct types, quiz every 3-4 slides, unique LIGHT backgrounds (soft pastels matching subject), real data, timed narration (t=0 first, 3-6 cues per content slide spaced 3-5s apart), all content in ${language}. NEVER use emoji — all icon fields use descriptive names like "brain", "heart", "chart", "lightbulb" etc. Use the new types (formula, graph, quote, infographic, image-spotlight, funfact, definition, code) when they match the subject.
 DURATION PER SLIDE: title=8-10s, content=15-25s, quiz=20-30s, summary=12-18s, outro=8-10s. NEVER set any slide to 60s. Total of all durations must roughly equal target minutes × 60.
-NARRATION: Write substantial narration — each content slide needs 4-8 sentences of teaching, explanation, and context. Split into timed cues.
+NARRATION: Write substantial narration — each content slide needs 4-8 sentences of teaching, explanation, and context. Split into timed cues. EACH section must start by connecting to the previous and end by bridging to the next. The presentation must feel like ONE continuous story, not disconnected slides.
+QUIZ NARRATION: For quiz slides, narration must ONLY introduce the question and encourage the viewer to think. NEVER reveal the correct answer, explanation, or hint. The quiz is interactive.
+STORYLINE: Establish a central question/mystery in the hook. Every section must build on the previous one. Use callbacks ("Remember earlier when we said...") and bridges ("But this is only half the story..."). The viewer should feel PULLED forward through a narrative, not watching random facts.
 GRAPH TYPE: Place functions[], xRange, yRange DIRECTLY in the content object (NOT nested in a data sub-object). Always provide both xRange and yRange.
 HYBRID: For 1-3 slides, create especially rich "hero" content — extra data, more cards/steps, deeper descriptions — for the most impactful moments.`;
 }
@@ -796,6 +820,7 @@ ${schemas}
 - DURATION GUIDE: title = 8-10s, content = 15-25s, quiz = 20-25s, summary = 12-18s, outro = 8-10s.
 - NEVER set duration to 60 seconds. Most slides should be 15-25 seconds.
 - IMPORTANT: Keep total JSON output compact. Do NOT over-elaborate narration text.
+- QUIZ SLIDE NARRATION: For quiz slides, narration must ONLY introduce the question and encourage the viewer to think. NEVER reveal the correct answer, explanation, or hint about which option is right. The quiz is interactive — the user picks their answer.
 
 ═══ TRANSITION & PARTICLE RULES ═══
 - Use the script's suggested "transition" and "particleTheme" for each section.

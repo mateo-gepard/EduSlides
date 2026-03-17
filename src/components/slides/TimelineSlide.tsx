@@ -8,7 +8,7 @@ export default function TimelineSlide({ content }: { content: TimelineContent })
   const events = content.events || [];
 
   return (
-    <div className="flex h-full px-8 py-8 gap-6 overflow-hidden">
+    <div className="flex h-full slide-pad gap-3 sm:gap-6 overflow-hidden">
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-5 shrink-0">
           <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">{content.chapter}</span>
@@ -56,7 +56,7 @@ export default function TimelineSlide({ content }: { content: TimelineContent })
           initial={{ opacity: 0, x: 30 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.6, duration: 0.5 }}
-          className="w-64 shrink-0 rounded-2xl border border-slate-200 bg-white/60 p-5 flex flex-col shadow-sm"
+          className="hidden sm:flex w-64 shrink-0 rounded-2xl border border-slate-200 bg-white/60 p-5 flex-col shadow-sm"
         >
           <h3 className="text-sm font-bold text-slate-800 mb-1">{content.sideChart.title}</h3>
           {content.sideChart.source && (
