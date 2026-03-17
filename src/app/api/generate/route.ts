@@ -16,6 +16,16 @@ import {
 export const maxDuration = 180;
 const FINAL_OUTPUT_SENTINEL = '#EndOfScript67!#';
 
+function computeDesignMaxTokens(provider: string, durationMinutes: number): number {
+  // Scale output budget with target duration; Sonnet gets the largest headroom.
+  if (provider === 'anthropic-haiku') return 8192;
+
+  const scaled = Math.round(14000 + (durationMinutes * 1800));
+  if (provider === 'anthropic') return Math.max(22000, Math.min(52000, scaled));
+  if (provider === 'openai') return Math.max(16000, Math.min(32000, scaled));
+  return Math.max(16000, Math.min(36000, scaled));
+}
+
 /* ─── Cost per 1M tokens (USD) ─── */
 const PRICING: Record<string, { input: number; output: number }> = {
   gemini: { input: 1.25, output: 10.0 },              // Gemini 3.1 Pro
@@ -843,7 +853,7 @@ export async function POST(req: Request) {
           // Phase 2: Design
           sendEvent('phase', { phase: 'designing', message: 'Designing visual slides...' });
 
-          const designMaxTokens = designProvider === 'anthropic-haiku' ? 8192 : 16000;
+          const designMaxTokens = computeDesignMaxTokens(designProvider, duration);
           const designSystemPrompt = designProvider === 'anthropic-haiku'
             ? buildDesignSystemPromptCompact(language)
             : buildDesignSystemPrompt(language);
@@ -862,7 +872,7 @@ export async function POST(req: Request) {
 
           const attemptTokenBudgets = [
             designMaxTokens,
-            Math.max(6000, Math.floor(designMaxTokens * 0.7)),
+            Math.max(12000, Math.floor(designMaxTokens * 0.8)),
           ];
 
           for (let attempt = 0; attempt < attemptTokenBudgets.length; attempt++) {
@@ -933,6 +943,7 @@ export async function POST(req: Request) {
 
           const model = createModel(designProvider, designKey);
           sendDebug('Single-pass model request started', { provider: designProvider });
+          const singlePassMaxTokens = computeDesignMaxTokens(designProvider, duration);
           const result = await generateTextLive({
             model,
             system: buildSystemPrompt(language),
@@ -944,7 +955,7 @@ export async function POST(req: Request) {
               language,
               additionalContext,
             }),
-            maxOutputTokens: 16000,
+            maxOutputTokens: singlePassMaxTokens,
             temperature: 0.7,
           }, 'single-pass', { endMarker: FINAL_OUTPUT_SENTINEL, validatePresentation: true });
 
