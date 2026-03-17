@@ -69,6 +69,8 @@ HISTORY / SOCIAL SCIENCES / POLITICS:
 - MODERATELY use: comparison, info-grid, list, stats, chart
 - RARELY use: formula, graph, code, diagram
 - Include imageQuery on image-spotlight sections with specific queries like "Battle of Waterloo 1815 painting" or "Martin Luther King Jr. 1963 speech photograph"
+- For history/social topics, create 3-6 sections with explicit imageQuery only when there is a concrete real-world visual target: named person, event, place, document, poster, artwork, or year-specific scene.
+- NEVER use generic imageQuery values like the slide heading alone, the broad topic name, or abstract concepts.
 
 BIOLOGY / MEDICINE / HEALTH:
 - HEAVILY use: diagram (body layouts, cell structures, organ systems), infographic (health data), process (biological processes), cycle (metabolic/life cycles)
@@ -398,7 +400,8 @@ CONTENT:
 IMAGES:
 - If a script section includes "imageQuery", copy it to the slide's "imageQuery" field.
 - For "image-spotlight" type: the imageQuery in content.imageQuery IS the image source.
-- Do not invent imageQuery values except for image-spotlight slides where the script suggests one.`;
+- Only include imageQuery when there is a clearly identifiable real-world image to search for.
+- Do not invent generic imageQuery values. If no specific visual target exists, omit imageQuery entirely.`;
 }
 
 /**

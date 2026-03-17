@@ -56,6 +56,7 @@ export default function PlayerPage() {
   const delayedStartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playTokenRef = useRef(0);
   const prefetchRunRef = useRef(0);
+  const ttsPromiseRef = useRef<Map<string, Promise<string | null>>>(new Map());
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const slideStartRef = useRef<number>(Date.now());
   const currentIndexRef = useRef(currentIndex);
@@ -73,6 +74,7 @@ export default function PlayerPage() {
   const slides = presentation?.slides || [];
   const slide = slides[currentIndex];
   const totalSlides = slides.length;
+  const currentAudioUrl = slide ? audioMap[slide.id] : undefined;
   const effectiveSlideDuration = Math.max(slide?.duration || 0, audioMinDuration);
 
   useEffect(() => {
@@ -149,11 +151,11 @@ export default function PlayerPage() {
   useEffect(() => {
     if (!slide?.narration?.length || !showSubtitles) { setSubtitle(''); return; }
     const cues = slide.narration;
-    const cueElapsed = audioMap[slide.id] ? Math.max(0, elapsed - 2) : elapsed;
+    const cueElapsed = currentAudioUrl ? Math.max(0, elapsed - 2) : elapsed;
     let current = '';
     for (const cue of cues) { if (cueElapsed >= cue.t) current = cue.text; }
     setSubtitle(current);
-  }, [elapsed, slide, showSubtitles, audioMap]);
+  }, [elapsed, slide, showSubtitles, currentAudioUrl]);
 
   /* ─── Auto-advance ─── */
   useEffect(() => {
@@ -180,27 +182,34 @@ export default function PlayerPage() {
     if (config.ttsProvider === 'browser') return null;
     const cached = audioMapRef.current[targetSlide.id];
     if (cached) return cached;
-    if (ttsGeneratingRef.current.has(targetSlide.id)) return null;
+    const inflight = ttsPromiseRef.current.get(targetSlide.id);
+    if (inflight) return await inflight;
 
-    ttsGeneratingRef.current.add(targetSlide.id);
-    try {
-      const text = targetSlide.narration.map((n) => n.text).join(' ');
-      if (!text.trim()) return null;
-      const ttsRes = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, provider: config.ttsProvider }),
-      });
-      if (!ttsRes.ok) throw new Error('TTS generation failed');
-      const blob = await ttsRes.blob();
-      const generatedUrl = URL.createObjectURL(blob);
-      setAudio(targetSlide.id, generatedUrl);
-      return generatedUrl;
-    } catch {
-      return null;
-    } finally {
-      ttsGeneratingRef.current.delete(targetSlide.id);
-    }
+    const promise = (async () => {
+      ttsGeneratingRef.current.add(targetSlide.id);
+      try {
+        const text = targetSlide.narration.map((n) => n.text).join(' ');
+        if (!text.trim()) return null;
+        const ttsRes = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, provider: config.ttsProvider }),
+        });
+        if (!ttsRes.ok) throw new Error('TTS generation failed');
+        const blob = await ttsRes.blob();
+        const generatedUrl = URL.createObjectURL(blob);
+        setAudio(targetSlide.id, generatedUrl);
+        return generatedUrl;
+      } catch {
+        return null;
+      } finally {
+        ttsGeneratingRef.current.delete(targetSlide.id);
+        ttsPromiseRef.current.delete(targetSlide.id);
+      }
+    })();
+
+    ttsPromiseRef.current.set(targetSlide.id, promise);
+    return await promise;
   }, [config.ttsProvider, setAudio]);
 
   // Prewarm provider TTS for current and next slide to keep starts close to 2s lead-in.
@@ -294,9 +303,8 @@ export default function PlayerPage() {
       }
     };
 
-    const audioUrl = audioMap[slide.id];
-    if (audioUrl) {
-      const audio = new Audio(audioUrl);
+    if (currentAudioUrl) {
+      const audio = new Audio(currentAudioUrl);
       audio.volume = volume;
       audioRef.current = audio;
       audio.preload = 'auto';
@@ -335,7 +343,7 @@ export default function PlayerPage() {
     return () => {
       stopAudio();
     };
-  }, [currentIndex, isPlaying, audioMap, slide, volume, stopAudio, config.ttsProvider, ensureProviderAudio]);
+  }, [currentIndex, isPlaying, currentAudioUrl, slide, volume, stopAudio, config.ttsProvider, ensureProviderAudio]);
 
   useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, [volume]);
 

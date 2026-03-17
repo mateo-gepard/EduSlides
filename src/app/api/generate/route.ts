@@ -158,17 +158,6 @@ function normalizeSlideHeading(slide: Record<string, unknown>): string {
   return 'slide';
 }
 
-function deriveImageQuery(
-  topic: string,
-  subject: string | undefined,
-  slide: Record<string, unknown>,
-): string {
-  const heading = normalizeSlideHeading(slide);
-  const subjectPart = subject?.trim() ? `${subject.trim()} ` : '';
-  const typePart = typeof slide.type === 'string' ? slide.type : 'slide';
-  return `${subjectPart}${topic} ${heading} ${typePart} historical photograph`;
-}
-
 async function fetchBingImageCandidates(query: string): Promise<string[]> {
   if (!query.trim()) return [];
   try {
@@ -307,35 +296,15 @@ export async function POST(req: Request) {
           }
         }
 
-        const isHistoryLike = /history|histor|krieg|war|weimar|mittelalter|renaissance|empire|revolution|world war/i.test(
-          `${topic} ${subject || ''}`,
-        );
+        const targetSlides = slides.filter((s) => Boolean(s.imageQuery));
 
-        const preferredTypes = new Set([
-          'image-spotlight', 'timeline', 'quote', 'funfact', 'title', 'summary', 'comparison',
-        ]);
-
-        const desiredImages = Math.min(
-          slides.length,
-          isHistoryLike
-            ? Math.max(5, Math.ceil(slides.length * 0.5))
-            : Math.max(3, Math.ceil(slides.length * 0.3)),
-        );
-
-        const targetSlides = slides
-          .filter((s) => preferredTypes.has(s.type) || Boolean(s.imageQuery))
-          .slice(0, Math.max(desiredImages + 2, 8));
-
-        for (const s of targetSlides) {
-          if (!s.imageQuery) {
-            s.imageQuery = deriveImageQuery(topic, subject, s as unknown as Record<string, unknown>);
-          }
+        if (targetSlides.length === 0) {
+          sendDebug('Image enrichment skipped: no explicit image queries in presentation');
+          return;
         }
 
         sendDebug('Image enrichment: candidate collection started', {
           targetSlides: targetSlides.length,
-          desiredImages,
-          isHistoryLike,
         });
 
         const candidatesById: Record<string, { query: string; candidates: string[] }> = {};
@@ -366,7 +335,6 @@ export async function POST(req: Request) {
               topic,
               subject,
               language,
-              desiredImages,
               slides: targetSlides.map((s) => ({
                 id: s.id,
                 type: s.type,
@@ -384,7 +352,7 @@ export async function POST(req: Request) {
             const geminiText = await withTimeout('gemini image linker', 12_000, async () => {
               return await collectText({
                 model: createFastGeminiModel(geminiKey),
-                system: `You assign best image URLs for slides.\nRules:\n- Return JSON only: {"images":[{"id":"slide-id","imageUrl":"https://...","imageQuery":"..."}]}\n- Use only provided candidate URLs when available.\n- Prefer distinct URLs across slides; avoid repeating same URL.\n- Prioritize historical photographs for history topics.\n- Keep at least ${Math.max(3, Math.floor(desiredImages * 0.7))} distinct slide-image assignments.`,
+                system: `You assign best image URLs for slides.\nRules:\n- Return JSON only: {"images":[{"id":"slide-id","imageUrl":"https://...","imageQuery":"..."}]}\n- Use only provided candidate URLs when available.\n- Prefer distinct URLs across slides; avoid repeating same URL.\n- Only assign an image when the candidate clearly matches the slide query and heading.\n- If no candidate is clearly relevant, omit that slide from the output instead of guessing.\n- Relevance is more important than coverage.`,
                 prompt: JSON.stringify(selectionPrompt),
                 maxOutputTokens: 1800,
                 temperature: 0.2,
@@ -420,7 +388,6 @@ export async function POST(req: Request) {
 
             sendDebug('Gemini image linker complete', {
               targetSlides: targetSlides.length,
-              desiredImages,
               linkedSlides: slides.filter((s) => Boolean(s.imageUrl)).length,
             });
             return;

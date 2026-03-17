@@ -74,7 +74,7 @@ export const usePresentationStore = create<PresentationState>((set, get) => ({
   currentIndex: 0,
   isPlaying: false,
   volume: 0.8,
-  showSubtitles: true,
+  showSubtitles: false,
   phase: 'idle',
   phaseMessage: '',
   generationCost: null,
