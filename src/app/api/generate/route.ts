@@ -606,8 +606,10 @@ export async function POST(req: Request) {
         let lastJsonProbeLen = 0;
         let completedByJsonProbe = false;
 
-        const CHUNK_STALL_MS = 30_000;    // No chunk at all for 30s → abort
+        const FIRST_TOKEN_MS = 90_000;   // Allow up to 90s for model to start (thinking time)
+        const CHUNK_STALL_MS = 30_000;    // Once streaming, no chunk for 30s → abort
         const PROGRESS_STALL_MS = 30_000; // Chunks arrive but text doesn't grow for 30s → abort
+        let receivedFirstToken = false;
 
         const iterator = streamed.textStream[Symbol.asyncIterator]();
         let lastDelta = '';
@@ -618,26 +620,34 @@ export async function POST(req: Request) {
         let lastProgressLen = 0;
 
         while (true) {
-          // Race each chunk read against a stall timeout so the model can't hang forever
+          // Use a generous timeout for the first token (model thinking), then a tighter one
+          const stallMs = receivedFirstToken ? CHUNK_STALL_MS : FIRST_TOKEN_MS;
           const next = await Promise.race([
             iterator.next(),
-            new Promise<'__stall__'>((resolve) => setTimeout(() => resolve('__stall__'), CHUNK_STALL_MS)),
+            new Promise<'__stall__'>((resolve) => setTimeout(() => resolve('__stall__'), stallMs)),
           ]);
 
           if (next === '__stall__') {
-            sendDebug('Model stalled: no new tokens for ' + (CHUNK_STALL_MS / 1000) + 's — aborting stream', {
+            const phase = receivedFirstToken ? 'streaming' : 'waiting for first token';
+            sendDebug(`Model stalled (${phase}): no tokens for ${stallMs / 1000}s — aborting`, {
               label,
               textLength: text.length,
+              receivedFirstToken,
             }, 'warn');
             if (typeof iterator.return === 'function') {
               try { await iterator.return(); } catch { /* best-effort */ }
             }
-            throw new Error(`Model stalled during ${label}: no output for ${CHUNK_STALL_MS / 1000}s after ${text.length} chars`);
+            throw new Error(`Model stalled during ${label} (${phase}): no output for ${stallMs / 1000}s after ${text.length} chars`);
           }
 
           if (next.done) break;
           const delta = typeof next.value === 'string' ? next.value : '';
           text += delta;
+
+          if (!receivedFirstToken && delta.length > 0) {
+            receivedFirstToken = true;
+            sendDebug('First token received', { label, afterMs: Date.now() - lastProgressTime });
+          }
 
           // Track real forward progress (text actually growing)
           if (text.length > lastProgressLen) {
