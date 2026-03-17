@@ -14,7 +14,7 @@ import {
   buildUserPrompt,
 } from '@/lib/prompts';
 
-export const maxDuration = 180;
+export const maxDuration = 300;
 const FINAL_OUTPUT_SENTINEL = '#EndOfScript67!#';
 
 function computeDesignMaxTokens(provider: string, durationMinutes: number): number {
@@ -253,6 +253,7 @@ export async function POST(req: Request) {
 
   // Use SSE to stream phase updates to the client
   const encoder = new TextEncoder();
+  const RequestStartedAt = Date.now();
   const stream = new ReadableStream({
     async start(controller) {
       function sendEvent(event: string, data: unknown) {
@@ -468,6 +469,7 @@ export async function POST(req: Request) {
         options?: {
           endMarker?: string;
           validatePresentation?: boolean;
+          partialTextRef?: { current: string };
         },
       ): Promise<{
         text: string;
@@ -644,6 +646,7 @@ export async function POST(req: Request) {
           if (next.done) break;
           const delta = typeof next.value === 'string' ? next.value : '';
           text += delta;
+          if (options?.partialTextRef) options.partialTextRef.current = text;
 
           if (!receivedFirstToken && delta.length > 0) {
             receivedFirstToken = true;
@@ -926,14 +929,21 @@ export async function POST(req: Request) {
             ? buildDesignUserPromptCompact(scriptJson, duration)
             : buildDesignUserPrompt(scriptJson, duration);
           const designModel = createModel(designProvider, designKey);
+          // Time-aware budget: leave 30s for post-processing (image enrichment, JSON parse, etc.)
+          const elapsedSoFarMs = Date.now() - RequestStartedAt;
+          const remainingBudgetMs = Math.max(60_000, (maxDuration * 1000) - elapsedSoFarMs - 30_000);
+          const designTimeoutMs = Math.min(remainingBudgetMs, 200_000);
+
           sendDebug('Design model request started', {
             provider: designProvider,
             maxOutputTokens: designMaxTokens,
+            designTimeoutMs: Math.round(designTimeoutMs / 1000),
+            remainingBudgetMs: Math.round(remainingBudgetMs / 1000),
           });
-          // Give the design phase a hard timeout to leave room for retries + post-processing
-          const designTimeoutMs = 140_000;
+
           let designResult: Awaited<ReturnType<typeof generateTextLive>> | null = null;
           let designError: Error | null = null;
+          const partialTextRef = { current: '' };
 
           const attemptTokenBudgets = [
             designMaxTokens,
@@ -941,19 +951,35 @@ export async function POST(req: Request) {
           ];
 
           for (let attempt = 0; attempt < attemptTokenBudgets.length; attempt++) {
+            // Check if we have enough time for another attempt (need at least 45s)
+            const elapsedNowMs = Date.now() - RequestStartedAt;
+            const timeLeftMs = (maxDuration * 1000) - elapsedNowMs - 30_000;
+            if (attempt > 0 && timeLeftMs < 45_000) {
+              sendDebug('Skipping retry — insufficient time remaining', {
+                attempt: attempt + 1,
+                timeLeftSeconds: Math.round(timeLeftMs / 1000),
+              }, 'warn');
+              break;
+            }
+
+            const attemptTimeoutMs = attempt === 0
+              ? designTimeoutMs
+              : Math.min(timeLeftMs, designTimeoutMs);
+
             const maxTokens = attemptTokenBudgets[attempt];
             if (attempt > 0) {
               sendEvent('phase', { phase: 'designing', message: 'Designing visual slides... (retrying with tighter output budget)' });
               sendDebug('Retrying design model after previous failure', {
                 attempt: attempt + 1,
                 maxOutputTokens: maxTokens,
+                attemptTimeoutSeconds: Math.round(attemptTimeoutMs / 1000),
               }, 'warn');
             }
 
             try {
               designResult = await runWithTimeoutAndHeartbeat(
                 `Design model attempt ${attempt + 1}`,
-                designTimeoutMs,
+                attemptTimeoutMs,
                 (signal) => generateTextLive({
                   model: designModel,
                   system: designSystemPrompt,
@@ -961,7 +987,7 @@ export async function POST(req: Request) {
                   maxOutputTokens: maxTokens,
                   temperature: 0.4,
                   abortSignal: signal,
-                }, 'design', { endMarker: FINAL_OUTPUT_SENTINEL, validatePresentation: true }),
+                }, 'design', { endMarker: FINAL_OUTPUT_SENTINEL, validatePresentation: true, partialTextRef }),
               );
               designError = null;
               break;
@@ -971,6 +997,27 @@ export async function POST(req: Request) {
                 attempt: attempt + 1,
                 error: designError.message,
               }, 'warn');
+
+              // Try to salvage partial output from a timeout
+              if (designError.message.includes('timed out') && partialTextRef.current.length > 500) {
+                const repaired = repairJson(partialTextRef.current);
+                try {
+                  const parsed = JSON.parse(repaired);
+                  if (parsed.slides && Array.isArray(parsed.slides) && parsed.slides.length >= 4) {
+                    sendDebug('Salvaged partial design output after timeout', {
+                      attempt: attempt + 1,
+                      slides: parsed.slides.length,
+                      textLength: repaired.length,
+                    }, 'warn');
+                    designResult = {
+                      text: repaired,
+                      usage: { inputTokens: 0, outputTokens: 0 },
+                    };
+                    designError = null;
+                    break;
+                  }
+                } catch { /* repair didn't produce valid JSON */ }
+              }
             }
           }
 

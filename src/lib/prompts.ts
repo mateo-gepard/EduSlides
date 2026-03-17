@@ -241,11 +241,13 @@ SLIDE STRUCTURE:
 
 NARRATION RULES:
 - Split the script's narration into timed cues. narration[0].t = 0 always.
-- Each cue = 1-2 natural spoken sentences. A content slide should have 3-6 cues minimum.
+- Each cue = 1 concise spoken sentence (max 25 words). Keep cues short for subtitle readability.
+- Content slides: 2-4 cues. Quiz/summary: 2-3 cues. Title/outro: 1-2 cues.
 - Space cues 3-5 seconds apart depending on sentence length.
 - Slide duration = (number of cues × average spacing) rounded up.
-- DURATION GUIDE: title = 8-10s, content slides = 15-30s, quiz = 20-30s, summary = 12-18s, outro = 8-10s.
+- DURATION GUIDE: title = 8-10s, content slides = 15-25s, quiz = 20-25s, summary = 12-18s, outro = 8-10s.
 - NEVER set duration to 60 seconds. Most slides should be 15-25 seconds. Total of all durations must roughly match target minutes × 60.
+- IMPORTANT: Keep total JSON output compact. Do NOT over-elaborate narration text.
 
 ═══════════════════════════════════════
 ALL 25 SLIDE TYPES — EXACT JSON SCHEMAS
@@ -787,11 +789,13 @@ ${schemas}
 
 ═══ NARRATION RULES ═══
 - Split the script's narration into timed cues. narration[0].t = 0 always.
-- Each cue = 1-2 natural spoken sentences. Content slides should have 3-6 cues minimum.
+- Each cue = 1 concise spoken sentence (max 25 words). Keep cues short for subtitle readability.
+- Content slides: 2-4 cues. Quiz/summary: 2-3 cues. Title/outro: 1-2 cues.
 - Space cues 3-5 seconds apart depending on sentence length.
 - Slide duration = (number of cues × average spacing) rounded up.
-- DURATION GUIDE: title = 8-10s, content = 15-30s, quiz = 20-30s, summary = 12-18s, outro = 8-10s.
+- DURATION GUIDE: title = 8-10s, content = 15-25s, quiz = 20-25s, summary = 12-18s, outro = 8-10s.
 - NEVER set duration to 60 seconds. Most slides should be 15-25 seconds.
+- IMPORTANT: Keep total JSON output compact. Do NOT over-elaborate narration text.
 
 ═══ TRANSITION & PARTICLE RULES ═══
 - Use the script's suggested "transition" and "particleTheme" for each section.

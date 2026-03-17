@@ -178,8 +178,16 @@ export default function CreatePage() {
       let buffer = '';
       let pendingPresentation: Presentation | null = null;
       const READ_TIMEOUT_MS = 60_000; // If no data arrives for 60s, assume server died
+      const MAX_GENERATION_MS = 330_000; // Absolute max: 5.5 minutes total (server maxDuration is 300s)
+      const generationStartedAt = Date.now();
 
       while (true) {
+        // Check absolute time limit (not reset by heartbeats)
+        if (Date.now() - generationStartedAt > MAX_GENERATION_MS) {
+          reader.cancel().catch(() => {});
+          throw new Error('Generation took too long. Please try a shorter duration or simpler topic.');
+        }
+
         const readResult = await Promise.race([
           reader.read(),
           new Promise<'__timeout__'>((resolve) =>
