@@ -7,6 +7,7 @@ import {
   buildScriptUserPrompt,
   buildDesignSystemPrompt,
   buildDesignSystemPromptCompact,
+  buildDesignSystemPromptOptimized,
   buildDesignUserPrompt,
   buildDesignUserPromptCompact,
   buildSystemPrompt,
@@ -920,7 +921,7 @@ export async function POST(req: Request) {
           const designMaxTokens = computeDesignMaxTokens(designProvider, duration);
           const designSystemPrompt = designProvider === 'anthropic-haiku'
             ? buildDesignSystemPromptCompact(language)
-            : buildDesignSystemPrompt(language);
+            : buildDesignSystemPromptOptimized(language, scriptJson);
           const designUserPrompt = designProvider === 'anthropic-haiku'
             ? buildDesignUserPromptCompact(scriptJson, duration)
             : buildDesignUserPrompt(scriptJson, duration);

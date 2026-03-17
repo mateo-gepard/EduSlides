@@ -57,9 +57,10 @@ export interface Slide {
   id: string;
   index: number;
   type: SlideType;
-  transition: 'fade' | 'slide' | 'zoom' | 'scale';
+  transition: 'fade' | 'slide' | 'zoom' | 'scale' | 'wipe' | 'blur' | 'flip';
   duration: number;
   background: string;
+  particleTheme?: 'bokeh' | 'geometric' | 'stars' | 'organic' | 'none';
   content: SlideContent;
   narration: { t: number; text: string }[];
   imageQuery?: string;

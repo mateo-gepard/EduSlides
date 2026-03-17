@@ -20,6 +20,8 @@ import {
 import { usePresentationStore } from '@/stores/presentation-store';
 import SlideRenderer from '@/components/SlideRenderer';
 import SlideQA from '@/components/SlideQA';
+import AmbientParticles from '@/components/AmbientParticles';
+import SlideBackground from '@/components/SlideBackground';
 
 /* ─── Transition variants ─── */
 const variants: Record<string, object> = {
@@ -27,6 +29,9 @@ const variants: Record<string, object> = {
   slide: { initial: { opacity: 0, x: 60 },       animate: { opacity: 1, x: 0 },     exit: { opacity: 0, x: -60 } },
   zoom:  { initial: { opacity: 0, scale: 1.08 }, animate: { opacity: 1, scale: 1 },  exit: { opacity: 0, scale: 0.92 } },
   scale: { initial: { opacity: 0, scale: 0.9 },  animate: { opacity: 1, scale: 1 },  exit: { opacity: 0, scale: 1.08 } },
+  wipe:  { initial: { clipPath: 'inset(0 100% 0 0)' }, animate: { clipPath: 'inset(0 0% 0 0)' }, exit: { clipPath: 'inset(0 0 0 100%)' } },
+  blur:  { initial: { opacity: 0, filter: 'blur(12px)' }, animate: { opacity: 1, filter: 'blur(0px)' }, exit: { opacity: 0, filter: 'blur(12px)' } },
+  flip:  { initial: { opacity: 0, rotateY: 90 },  animate: { opacity: 1, rotateY: 0 }, exit: { opacity: 0, rotateY: -90 } },
 };
 
 /* ─── Format seconds → "0:05" ─── */
@@ -409,9 +414,25 @@ export default function PlayerPage() {
                 {...v}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
                 className="absolute inset-0"
-                style={{ background: slide.background }}
               >
-                <SlideRenderer slide={slide} />
+                {/* Layered background system */}
+                <SlideBackground background={slide.background} />
+                {/* Ambient particles */}
+                <AmbientParticles
+                  theme={slide.particleTheme || 'bokeh'}
+                  accentColor={presentation.metadata.accentColor || '#818cf8'}
+                  opacity={0.6}
+                />
+                {/* Ken Burns camera motion wrapper */}
+                <motion.div
+                  className="absolute inset-0"
+                  initial={{ scale: 1.0 }}
+                  animate={{ scale: 1.06 }}
+                  transition={{ duration: effectiveSlideDuration || 8, ease: 'linear' }}
+                  key={`kb-${slide.id}`}
+                >
+                  <SlideRenderer slide={slide} />
+                </motion.div>
               </motion.div>
             </AnimatePresence>
           </div>
