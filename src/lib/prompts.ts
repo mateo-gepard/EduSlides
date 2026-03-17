@@ -160,6 +160,8 @@ export function buildDesignSystemPrompt(language: string): string {
 TASK: Receive a JSON script → produce final slide JSON with visual types, colors, timing, and all data structures.
 
 OUTPUT: valid JSON only — no markdown fences, no commentary, no trailing commas.
+AFTER the final closing JSON brace, append this exact sentinel on its own line and nothing after it:
+#EndOfScript67!#
 
 ═══════════════════════════════════════
 OUTPUT FORMAT
@@ -407,6 +409,8 @@ export function buildDesignSystemPromptCompact(language: string): string {
   return `You are a presentation designer. Transform a JSON educational script into final slide JSON.
 
 CRITICAL: Output ONLY valid JSON — no markdown fences, no commentary, no trailing commas. Maximum 8 slides total.
+AFTER the final closing JSON brace, append this exact sentinel on its own line and nothing after it:
+#EndOfScript67!#
 
 FORMAT:
 {"metadata":{"title":"str","subtitle":"str","subject":"str","level":"str","language":"${language}","estimatedDuration":<min>,"totalSlides":<n>,"accentColor":"#hex"},"slides":[...]}
@@ -445,7 +449,10 @@ Target duration: ${duration} minutes.
 SCRIPT:
 ${scriptJson}
 
-Generate the full presentation JSON now.`;
+Generate the full presentation JSON now.
+
+After the final closing JSON brace, append this exact sentinel on its own line and nothing after it:
+#EndOfScript67!#`;
 }
 
 /**
@@ -474,7 +481,10 @@ export function buildDesignUserPromptCompact(scriptJson: string, duration: numbe
 SCRIPT:
 ${trimmed}
 
-Generate compact JSON now.`;
+Generate compact JSON now.
+
+After the final closing JSON brace, append this exact sentinel on its own line and nothing after it:
+#EndOfScript67!#`;
 }
 
 /* ═══════════════════════════════════════
@@ -486,6 +496,8 @@ export function buildSystemPrompt(language: string): string {
   return `You are a world-class educational content architect. You produce premium, interactive presentations that rival hand-crafted HTML: rich data, animated visualizations, timed narration, and diverse visual layouts.
 
 OUTPUT: valid JSON only — no markdown fences, no commentary, no trailing commas.
+AFTER the final closing JSON brace, append this exact sentinel on its own line and nothing after it:
+#EndOfScript67!#
 
 TOP-LEVEL:
 {
@@ -555,5 +567,8 @@ Target duration: ${params.duration} minutes (approximately ${approxSlides} slide
 Language: ${params.language}
 ${params.additionalContext ? `\nAdditional context:\n${params.additionalContext}` : ''}
 
-Generate the full JSON now.`;
+Generate the full JSON now.
+
+After the final closing JSON brace, append this exact sentinel on its own line and nothing after it:
+#EndOfScript67!#`;
 }

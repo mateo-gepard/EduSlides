@@ -14,6 +14,7 @@ import {
 } from '@/lib/prompts';
 
 export const maxDuration = 180;
+const FINAL_OUTPUT_SENTINEL = '#EndOfScript67!#';
 
 /* ─── Cost per 1M tokens (USD) ─── */
 const PRICING: Record<string, { input: number; output: number }> = {
@@ -448,6 +449,10 @@ export async function POST(req: Request) {
       async function generateTextLive(
         params: Parameters<typeof streamText>[0] & { abortSignal?: AbortSignal },
         label: string,
+        options?: {
+          endMarker?: string;
+          validatePresentation?: boolean;
+        },
       ): Promise<{
         text: string;
         usage: { inputTokens: number; outputTokens: number };
@@ -595,6 +600,53 @@ export async function POST(req: Request) {
           if (next.done) break;
           const delta = typeof next.value === 'string' ? next.value : '';
           text += delta;
+
+          if (options?.endMarker && text.includes(options.endMarker)) {
+            const markerIndex = text.indexOf(options.endMarker);
+            const beforeMarker = text.slice(0, markerIndex).trimEnd();
+
+            if (options.validatePresentation) {
+              const candidate = extractJson(beforeMarker);
+              const candidateValidation = validateEarlyCompletionCandidate(candidate);
+              if (!candidateValidation.ok) {
+                sendDebug('Sentinel detected but payload failed validation; continuing stream', {
+                  label,
+                  reasons: candidateValidation.reasons.slice(0, 6),
+                  slides: candidateValidation.slides,
+                }, 'warn');
+              } else {
+                completedByJsonProbe = true;
+                text = candidate;
+                sendDebug('Detected explicit output sentinel; finalizing immediately', {
+                  label,
+                  textLength: text.length,
+                  slides: candidateValidation.slides,
+                  narrationSlides: candidateValidation.narrationSlides,
+                  narrationChars: candidateValidation.narrationChars,
+                }, 'warn');
+                if (typeof iterator.return === 'function') {
+                  try {
+                    await iterator.return();
+                  } catch {
+                    // Best-effort iterator shutdown.
+                  }
+                }
+                break;
+              }
+            } else {
+              completedByJsonProbe = true;
+              text = beforeMarker;
+              sendDebug('Detected explicit output sentinel', { label, textLength: text.length }, 'warn');
+              if (typeof iterator.return === 'function') {
+                try {
+                  await iterator.return();
+                } catch {
+                  // Best-effort iterator shutdown.
+                }
+              }
+              break;
+            }
+          }
 
           if (delta && delta === lastDelta) {
             duplicateDeltaCount += 1;
@@ -829,7 +881,7 @@ export async function POST(req: Request) {
                   maxOutputTokens: maxTokens,
                   temperature: 0.4,
                   abortSignal: signal,
-                }, 'design'),
+                }, 'design', { endMarker: FINAL_OUTPUT_SENTINEL, validatePresentation: true }),
               );
               designError = null;
               break;
@@ -889,7 +941,7 @@ export async function POST(req: Request) {
             }),
             maxOutputTokens: 16000,
             temperature: 0.7,
-          }, 'single-pass');
+          }, 'single-pass', { endMarker: FINAL_OUTPUT_SENTINEL, validatePresentation: true });
 
           sendDebug('Single-pass model response received', {
             provider: designProvider,
